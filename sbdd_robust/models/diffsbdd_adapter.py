@@ -143,6 +143,21 @@ class DiffSBDDAdapter(BaseSBDDAdapter):
                 import json, runpy, sys
                 from pathlib import Path
 
+                # PyTorch 2.6+ defaults torch.load(weights_only=True). DiffSBDD checkpoints
+                # (PyTorch Lightning 1.8) pickle argparse.Namespace and other objects; need full unpickle.
+                import torch as _torch
+                _torch_load_orig = _torch.load
+
+                def _torch_load_compat(*args, **kwargs):
+                    if "weights_only" not in kwargs:
+                        try:
+                            return _torch_load_orig(*args, weights_only=False, **kwargs)
+                        except TypeError:
+                            return _torch_load_orig(*args, **kwargs)
+                    return _torch_load_orig(*args, **kwargs)
+
+                _torch.load = _torch_load_compat
+
                 _wd = Path(__file__).resolve().parent
                 _REPO = {json.dumps(str(self.repo_root))}
                 if _REPO not in sys.path:
