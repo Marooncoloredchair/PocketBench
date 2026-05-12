@@ -1,0 +1,47 @@
+project_root: .
+seed: 7
+
+paths:
+  results: data/results
+  generations: data/generations
+
+extraction_radius: 12.0
+brittleness_std_threshold: 0.15
+invariant_tags:
+  - atom_shuffle
+  - coordinate_jitter
+
+pockets:
+  - id: smoke_01
+    pdb: data/raw/smoke/shared_protein.pdb
+    ligand_chain: A
+    ligand_resseq: 99
+    full_pdb: data/raw/smoke/shared_protein.pdb
+    ref_ligand: "A:99"
+  - id: smoke_02
+    pdb: data/raw/smoke/shared_protein.pdb
+    ligand_chain: A
+    ligand_resseq: 99
+    full_pdb: data/raw/smoke/shared_protein.pdb
+    ref_ligand: "A:99"
+  - id: smoke_03
+    pdb: data/raw/smoke/shared_protein.pdb
+    ligand_chain: A
+    ligand_resseq: 99
+    full_pdb: data/raw/smoke/shared_protein.pdb
+    ref_ligand: "A:99"
+
+perturbations:
+  - tag: original
+    type: identity
+  - tag: atom_shuffle
+    type: atom_shuffle
+    seed: 11
+  - tag: coordinate_jitter
+    type: coordinate_jitter
+    sigma: 0.08
+    seed: 13
+
+model:
+  type: mock
+  n_samples: 8

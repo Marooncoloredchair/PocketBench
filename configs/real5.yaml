@@ -1,0 +1,77 @@
+# Five RCSB / DiffSBDD-example pockets for DiffSBDD + invariant brittleness.
+# PDBs under data/raw/real/; ligand chain:resseq verified against HETATM / Bio.PDB.
+# sbdd-robust forwards DiffSBDD --resi_list from extracted pockets (ref_ligand kept for parity / docs).
+
+project_root: .
+seed: 0
+
+paths:
+  results: data/results
+  generations: data/generations
+
+extraction_radius: 8.0
+brittleness_std_threshold: 0.05
+invariant_tags:
+  - atom_shuffle
+  - coordinate_jitter
+  - crop_radius_plus_1.5
+  - crop_radius_minus_1.5
+
+pockets:
+  - id: 3RFM
+    pdb: data/raw/real/3rfm.pdb
+    ligand_chain: A
+    ligand_resseq: 330
+    full_pdb: data/raw/real/3rfm.pdb
+    ref_ligand: "A:330"
+  - id: 5NDU
+    pdb: data/raw/real/5ndu.pdb
+    ligand_chain: A
+    ligand_resseq: 201
+    full_pdb: data/raw/real/5ndu.pdb
+    ref_ligand: "A:201"
+  - id: 2GM1
+    pdb: data/raw/real/2gm1.pdb
+    ligand_chain: A
+    ligand_resseq: 371
+    full_pdb: data/raw/real/2gm1.pdb
+    ref_ligand: "A:371"
+  - id: 4W9W
+    pdb: data/raw/real/4w9w.pdb
+    ligand_chain: A
+    ligand_resseq: 401
+    full_pdb: data/raw/real/4w9w.pdb
+    ref_ligand: "A:401"
+  - id: 2BUJ
+    pdb: data/raw/real/2buj.pdb
+    ligand_chain: A
+    ligand_resseq: 1301
+    full_pdb: data/raw/real/2buj.pdb
+    ref_ligand: "A:1301"
+
+perturbations:
+  - tag: original
+    type: identity
+  - tag: atom_shuffle
+    type: atom_shuffle
+    seed: 0
+  - tag: coordinate_jitter
+    type: coordinate_jitter
+    sigma: 0.1
+    seed: 1
+  - tag: crop_radius_plus_1.5
+    type: crop_radius_plus
+    delta_angstrom: 1.5
+  - tag: crop_radius_minus_1.5
+    type: crop_radius_minus
+    delta_angstrom: 1.5
+
+model:
+  type: diffsbdd
+  n_samples: 20
+  repo_root: D:/obsfu/DiffSBDD
+  checkpoint: D:/obsfu/DiffSBDD/checkpoints/crossdocked_fullatom_cond.ckpt
+  python_exe: D:/Miniforge/envs/diffsbdd/python.exe
+  resamplings: 1
+  jump_length: 1
+  sanitize: false

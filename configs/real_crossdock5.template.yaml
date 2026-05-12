@@ -1,0 +1,60 @@
+# Template: 5 real CrossDocked-style pockets on D: — fill paths after you place PDBs (+ ligand SDF or HET res).
+# sbdd-robust uses ``id`` (not ``pocket_id``) for each pocket row.
+#
+# Data: DiffSBDD repo has NO bundled CrossDocked2020 test list under data/test_sets/.
+# Build processed test from CrossDocked (see DiffSBDD README ``process_crossdock.py``) or
+# download complexes and point ``pdb`` / ``full_pdb`` here.
+#
+# With ``resi_list`` in extracted pockets, DiffSBDD runs with --resi_list only (omit ref_ligand in adapter).
+# Otherwise set ligand_chain + ligand_resseq OR sdf + ref_ligand for generate_ligands.
+
+project_root: .
+seed: 0
+
+paths:
+  results: data/results
+  generations: data/generations
+
+extraction_radius: 8.0
+brittleness_std_threshold: 0.05
+invariant_tags:
+  - atom_shuffle
+  - coordinate_jitter
+  - crop_radius_plus_1.5
+  - crop_radius_minus_1.5
+
+pockets:
+  - id: REPLACE_1
+    pdb: data/raw/real/REPLACE.pdb
+    ligand_chain: A
+    ligand_resseq: 1
+    full_pdb: data/raw/real/REPLACE.pdb
+    ref_ligand: "A:1"
+  # ... copy block for 4 more IDs
+
+perturbations:
+  - tag: original
+    type: identity
+  - tag: atom_shuffle
+    type: atom_shuffle
+    seed: 0
+  - tag: coordinate_jitter
+    type: coordinate_jitter
+    sigma: 0.1
+    seed: 1
+  - tag: crop_plus
+    type: crop_radius_plus
+    delta_angstrom: 1.5
+  - tag: crop_minus
+    type: crop_radius_minus
+    delta_angstrom: 1.5
+
+model:
+  type: diffsbdd
+  n_samples: 20
+  repo_root: D:/obsfu/DiffSBDD
+  checkpoint: D:/obsfu/DiffSBDD/checkpoints/crossdocked_fullatom_cond.ckpt
+  python_exe: D:/Miniforge/envs/diffsbdd/python.exe
+  resamplings: 1
+  jump_length: 1
+  sanitize: false

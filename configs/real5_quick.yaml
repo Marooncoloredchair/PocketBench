@@ -1,0 +1,44 @@
+# Quick sanity: 3RFM only, few samples (parallel to full real5 run).
+# Needs >=2 invariant tags so flag_invariant_brittleness can compute std (see cli).
+
+project_root: .
+seed: 0
+
+paths:
+  results: data/results
+  generations: data/generations
+
+extraction_radius: 8.0
+brittleness_std_threshold: 0.05
+invariant_tags:
+  - atom_shuffle
+  - coordinate_jitter
+
+pockets:
+  - id: 3RFM
+    pdb: data/raw/real/3rfm.pdb
+    ligand_chain: A
+    ligand_resseq: 330
+    full_pdb: data/raw/real/3rfm.pdb
+    ref_ligand: "A:330"
+
+perturbations:
+  - tag: original
+    type: identity
+  - tag: atom_shuffle
+    type: atom_shuffle
+    seed: 0
+  - tag: coordinate_jitter
+    type: coordinate_jitter
+    sigma: 0.1
+    seed: 1
+
+model:
+  type: diffsbdd
+  n_samples: 5
+  repo_root: D:/obsfu/DiffSBDD
+  checkpoint: D:/obsfu/DiffSBDD/checkpoints/crossdocked_fullatom_cond.ckpt
+  python_exe: D:/Miniforge/envs/diffsbdd/python.exe
+  resamplings: 1
+  jump_length: 1
+  sanitize: false

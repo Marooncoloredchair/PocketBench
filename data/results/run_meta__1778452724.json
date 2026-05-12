@@ -1,0 +1,7 @@
+{
+  "run_id": "1778452724",
+  "metrics_csv": "D:\\obsfu\\sbdd-robust\\data\\results\\metrics_per_condition__run1778452724.csv",
+  "flagged_csv": "D:\\obsfu\\sbdd-robust\\data\\results\\metrics_flagged__run1778452724.csv",
+  "summary_csv": "D:\\obsfu\\sbdd-robust\\data\\results\\robustness_summary__run1778452724.csv",
+  "n_rows": 9
+}

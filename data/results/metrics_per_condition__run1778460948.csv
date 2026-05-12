@@ -1,0 +1,4 @@
+pocket_id,perturbation_type,perturbation_tag,model_name,run_id,n_total,n_valid,validity,n_unique_valid,uniqueness,mean_qed,std_qed,mean_sa,std_sa
+3RFM,original,original,diffsbdd,1778460948,5,5,1.0,5,1.0,0.5599129798039562,0.2195804883807741,3.6097928363735705,0.40905689410106
+3RFM,invariant_atom_shuffle,atom_shuffle,diffsbdd,1778460948,5,5,1.0,5,1.0,0.5417980856443121,0.06937265918213181,3.577341461185209,0.6875087346086284
+3RFM,invariant_coordinate_jitter,coordinate_jitter,diffsbdd,1778460948,5,3,0.6,3,1.0,0.7869296703775253,0.09960685682217776,4.472425102011934,0.46837562798358245

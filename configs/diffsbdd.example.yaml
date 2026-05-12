@@ -1,0 +1,55 @@
+# Real DiffSBDD paths on D: (Windows). Zenodo checkpoint record: 8183747 (not 7121477 — that URL 404s).
+# Download (already done if you used scripts/download_diffsbdd_checkpoint.ps1):
+#   crossdocked_fullatom_cond.ckpt → D:/obsfu/DiffSBDD/checkpoints/
+#
+# Verify in your DiffSBDD conda env (see DiffSBDD README / environment.yaml) BEFORE sbdd-robust:
+#   cd D:/obsfu/DiffSBDD
+#   python generate_ligands.py checkpoints/crossdocked_fullatom_cond.ckpt ^
+#     --pdbfile D:/obsfu/sbdd-robust/data/raw/smoke/shared_protein.pdb ^
+#     --ref_ligand A:99 --outfile test.sdf --n_samples 5
+#
+# Then:
+#   cd D:/obsfu/sbdd-robust
+#   python -m sbdd_robust run --config configs/diffsbdd.example.yaml
+
+project_root: .
+seed: 0
+
+paths:
+  results: data/results
+  generations: data/generations
+
+extraction_radius: 12.0
+brittleness_std_threshold: 0.05
+invariant_tags:
+  - atom_shuffle
+  - coordinate_jitter
+
+pockets:
+  - id: smoke_diffsbdd
+    pdb: data/raw/smoke/shared_protein.pdb
+    ligand_chain: A
+    ligand_resseq: 99
+    full_pdb: data/raw/smoke/shared_protein.pdb
+    ref_ligand: "A:99"
+
+perturbations:
+  - tag: original
+    type: identity
+  - tag: atom_shuffle
+    type: atom_shuffle
+    seed: 0
+  - tag: coordinate_jitter
+    type: coordinate_jitter
+    sigma: 0.05
+    seed: 1
+
+model:
+  type: diffsbdd
+  n_samples: 4
+  repo_root: D:/obsfu/DiffSBDD
+  checkpoint: D:/obsfu/DiffSBDD/checkpoints/crossdocked_fullatom_cond.ckpt
+  python_exe: D:/Miniforge/envs/diffsbdd/python.exe
+  resamplings: 10
+  jump_length: 1
+  sanitize: false

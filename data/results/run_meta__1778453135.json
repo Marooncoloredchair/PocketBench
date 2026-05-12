@@ -1,0 +1,21 @@
+{
+  "run_id": "1778453135",
+  "metrics_csv": "D:\\obsfu\\sbdd-robust\\data\\results\\metrics_per_condition__run1778453135.csv",
+  "flagged_csv": "D:\\obsfu\\sbdd-robust\\data\\results\\metrics_flagged__run1778453135.csv",
+  "summary_csv": "D:\\obsfu\\sbdd-robust\\data\\results\\robustness_summary__run1778453135.csv",
+  "figure_paths": [
+    "D:\\obsfu\\sbdd-robust\\data\\results\\figures\\run1778453135_validity.png",
+    "D:\\obsfu\\sbdd-robust\\data\\results\\figures\\run1778453135_uniqueness.png",
+    "D:\\obsfu\\sbdd-robust\\data\\results\\figures\\run1778453135_mean_qed.png",
+    "D:\\obsfu\\sbdd-robust\\data\\results\\figures\\run1778453135_mean_sa.png"
+  ],
+  "n_rows": 9,
+  "git_provenance": {
+    "sbdd_robust_repo_root": "D:\\obsfu\\sbdd-robust",
+    "sbdd_robust_commit": null,
+    "sbdd_robust_dirty": null,
+    "diffsbdd_repo_root": null,
+    "diffsbdd_commit": null,
+    "diffsbdd_dirty": null
+  }
+}
