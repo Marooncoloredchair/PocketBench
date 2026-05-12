@@ -101,7 +101,9 @@ def extract_pocket(
     for model in structure:
         for chain in model:
             for res in chain:
-                if not is_aa(res, standard=True):
+                # standard=False: include MSE, HIE, etc. Otherwise the binding shell can be
+                # empty near the ligand while standard=True (common in deposited PDBs).
+                if not is_aa(res, standard=False):
                     continue
                 resname = res.get_resname().strip()
                 resid = res.id[1]

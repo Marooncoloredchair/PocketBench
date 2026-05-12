@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List
@@ -124,44 +125,48 @@ def cmd_run(args: argparse.Namespace) -> int:
     threshold = float(cfg.get("brittleness_std_threshold", 0.1))
     radius = float(cfg.get("extraction_radius", 8.0))
     n_samples = int(cfg.model.get("n_samples", 10))
+    skip_failed = bool(cfg.get("skip_failed_pockets", False))
 
     rows: list[dict[str, Any]] = []
 
     for pc in pockets_cfg:
         pid = str(pc.id)
-        pdb = _resolve(root, pc.pdb)
-        sdf = pc.get("sdf")
-        sdf_path = _resolve(root, sdf) if sdf else None
-        lc = pc.get("ligand_chain")
-        lr = pc.get("ligand_resseq")
-        base_pocket = load_pocket_from_complex(
-            pdb_path=pdb,
-            sdf_path=sdf_path,
-            radius=radius,
-            pocket_id=pid,
-            metadata={"full_pdb": str(pdb)},
-            ligand_chain=str(lc) if lc is not None else None,
-            ligand_resseq=int(lr) if lr is not None else None,
-        )
-        adapter = _build_adapter(cfg, pc, root)
-        pert_pockets = _apply_perturbations(base_pocket, pert_specs)
-        gen_root = _resolve(root, cfg.paths.generations) / f"run_{run_id}"
-        for pock in pert_pockets:
-            wdir = gen_root / pid / str(pock.metadata.get("perturbation_tag", "unknown"))
-            wdir.mkdir(parents=True, exist_ok=True)
-            mols = adapter.generate(pock, n_samples=n_samples, workdir=wdir)
-            summary = chem_mod.summarize_molecules(mols)
-            row = {
-                "pocket_id": pid,
-                "perturbation_type": pock.metadata.get("perturbation_type", ""),
-                "perturbation_tag": pock.metadata.get("perturbation_tag", ""),
-                "model_name": adapter.name,
-                "run_id": run_id,
-                **summary,
-            }
-            rows.append(row)
-        if isinstance(adapter, DiffSBDDAdapter):
-            pass
+        try:
+            pdb = _resolve(root, pc.pdb)
+            sdf = pc.get("sdf")
+            sdf_path = _resolve(root, sdf) if sdf else None
+            lc = pc.get("ligand_chain")
+            lr = pc.get("ligand_resseq")
+            base_pocket = load_pocket_from_complex(
+                pdb_path=pdb,
+                sdf_path=sdf_path,
+                radius=radius,
+                pocket_id=pid,
+                metadata={"full_pdb": str(pdb)},
+                ligand_chain=str(lc) if lc is not None else None,
+                ligand_resseq=int(lr) if lr is not None else None,
+            )
+            adapter = _build_adapter(cfg, pc, root)
+            pert_pockets = _apply_perturbations(base_pocket, pert_specs)
+            gen_root = _resolve(root, cfg.paths.generations) / f"run_{run_id}"
+            for pock in pert_pockets:
+                wdir = gen_root / pid / str(pock.metadata.get("perturbation_tag", "unknown"))
+                wdir.mkdir(parents=True, exist_ok=True)
+                mols = adapter.generate(pock, n_samples=n_samples, workdir=wdir)
+                summary = chem_mod.summarize_molecules(mols)
+                row = {
+                    "pocket_id": pid,
+                    "perturbation_type": pock.metadata.get("perturbation_type", ""),
+                    "perturbation_tag": pock.metadata.get("perturbation_tag", ""),
+                    "model_name": adapter.name,
+                    "run_id": run_id,
+                    **summary,
+                }
+                rows.append(row)
+        except Exception as e:
+            if not skip_failed:
+                raise
+            print(f"[sbdd_robust] SKIP pocket {pid}: {e}", file=sys.stderr)
 
     df = pd.DataFrame(rows)
     df.to_csv(metrics_csv, index=False)
