@@ -15,6 +15,7 @@ from rdkit import Chem
 from sbdd_robust.datasets.pdb_merge import merge_pocket_into_full_pdb
 from sbdd_robust.datasets.pocket import Pocket
 from sbdd_robust.models.base_adapter import BaseSBDDAdapter
+from sbdd_robust.models.diffsbdd_lightning_patch import ensure_lightning_resi_patch
 
 # CLI surface verified against upstream ``generate_ligands.py`` (positional
 # ``checkpoint``, then ``--pdbfile``, ``--ref_ligand``, ``--outfile``, etc.):
@@ -69,6 +70,7 @@ class DiffSBDDAdapter(BaseSBDDAdapter):
             raise FileNotFoundError(f"DiffSBDD generate_ligands.py not found at {script}")
 
     def generate(self, pocket: Pocket, n_samples: int, workdir: Path) -> List[Chem.Mol]:
+        ensure_lightning_resi_patch(self.repo_root)
         workdir.mkdir(parents=True, exist_ok=True)
         if self.full_pdb is not None:
             pdb_in = merge_pocket_into_full_pdb(pocket, self.full_pdb)
