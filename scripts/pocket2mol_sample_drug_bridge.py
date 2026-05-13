@@ -136,14 +136,14 @@ def main() -> None:
         out_root = td_path / "p2m_out"
         out_root.mkdir(parents=True, exist_ok=True)
 
+        # ``--center=-1.2,3,4`` as one argv token so negatives are not parsed as flags.
         center_s = ",".join(str(round(x, 4)) for x in center)
         cmd = [
             sys.executable,
             str(sample_py),
             "--pdb_path",
             str(Path(args.pdb_path).resolve()),
-            "--center",
-            center_s,
+            f"--center={center_s}",
             "--bbox_size",
             str(bbox_size),
             "--config",

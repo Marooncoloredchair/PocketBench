@@ -100,7 +100,11 @@ def summarize_robustness_vs_original(
     metrics = metrics_subset or _metric_columns(df)
     rows: list[dict[str, Any]] = []
     df = df.copy()
+    if df.empty or "pocket_id" not in df.columns or "model_name" not in df.columns:
+        return pd.DataFrame(rows)
     tag_col = "perturbation_tag" if "perturbation_tag" in df.columns else "perturbation_type"
+    if tag_col not in df.columns:
+        return pd.DataFrame(rows)
     df["_ptag"] = df[tag_col].astype(str)
 
     for (pid, model), grp in df.groupby(["pocket_id", "model_name"], sort=False):
