@@ -22,6 +22,29 @@ from pathlib import Path
 import numpy as np
 import yaml
 
+
+def _default_pocket2mol_root() -> Path:
+    """Prefer env / Linux Colab layout; ignore Windows ``D:/...`` in POCKET2MOL_ROOT on POSIX."""
+    raw = (os.environ.get("POCKET2MOL_ROOT") or "").strip()
+    if raw and sys.platform != "win32" and len(raw) > 1 and raw[1] == ":":
+        raw = ""
+    if raw:
+        return Path(raw).expanduser().resolve()
+    for cand in (Path("/content/Pocket2Mol"), Path.cwd()):
+        if (cand / "sample_for_pdb.py").is_file():
+            return cand.resolve()
+    return Path("/content/Pocket2Mol")
+
+
+def _coerce_pocket2mol_root(explicit: Path | None) -> Path:
+    """Resolve bridge repo root; on POSIX, drop explicit Windows ``X:/...`` paths (broken under pathlib)."""
+    if explicit is not None:
+        s = str(explicit)
+        if not (sys.platform != "win32" and len(s) > 1 and s[1] == ":"):
+            return explicit.expanduser().resolve()
+    return _default_pocket2mol_root()
+
+
 def _pocket_center_and_bbox(
     pdb_path: Path,
     margin: float = 3.0,
@@ -73,7 +96,7 @@ def main() -> None:
     ap.add_argument(
         "--pocket2mol_root",
         type=Path,
-        default=Path(os.environ.get("POCKET2MOL_ROOT", "D:/obsfu/Pocket2Mol")),
+        default=None,
         help="Clone of pengxingang/Pocket2Mol (used as cwd for sample_for_pdb.py).",
     )
     ap.add_argument(
@@ -84,7 +107,7 @@ def main() -> None:
     )
     args, extra = ap.parse_known_args()
 
-    root = args.pocket2mol_root.resolve()
+    root = _coerce_pocket2mol_root(args.pocket2mol_root)
     sample_py = root / "sample_for_pdb.py"
     if not sample_py.is_file():
         raise FileNotFoundError(f"Expected {sample_py} — set --pocket2mol_root or POCKET2MOL_ROOT.")

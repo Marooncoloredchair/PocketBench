@@ -43,7 +43,11 @@ def flag_invariant_brittleness(
     """
     inv = set(invariant_tags)
     out = df.copy()
+    if out.empty or "pocket_id" not in out.columns or "model_name" not in out.columns:
+        return out.assign(brittle_invariant=False, brittleness_note="")
     tag_col = "perturbation_tag" if "perturbation_tag" in out.columns else "perturbation_type"
+    if tag_col not in out.columns:
+        return out.assign(brittle_invariant=False, brittleness_note="missing_perturbation_tag")
     out["_ptag"] = out[tag_col].astype(str)
 
     metrics = metrics_subset or _metric_columns(out)
