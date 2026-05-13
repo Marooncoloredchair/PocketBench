@@ -46,6 +46,7 @@ def git_is_dirty(repo: Path, timeout_s: float = 15.0) -> Optional[bool]:
 def collect_git_provenance(
     sbdd_robust_repo: Path,
     diffsbdd_repo: Optional[Path] = None,
+    pocket2mol_repo: Optional[Path] = None,
 ) -> dict[str, Any]:
     sbdd_robust_repo = Path(sbdd_robust_repo).resolve()
     out: dict[str, Any] = {
@@ -62,4 +63,13 @@ def collect_git_provenance(
         out["diffsbdd_repo_root"] = None
         out["diffsbdd_commit"] = None
         out["diffsbdd_dirty"] = None
+    if pocket2mol_repo is not None:
+        pr = Path(pocket2mol_repo).resolve()
+        out["pocket2mol_repo_root"] = str(pr)
+        out["pocket2mol_commit"] = git_commit(pr)
+        out["pocket2mol_dirty"] = git_is_dirty(pr)
+    else:
+        out["pocket2mol_repo_root"] = None
+        out["pocket2mol_commit"] = None
+        out["pocket2mol_dirty"] = None
     return out

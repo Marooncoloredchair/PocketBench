@@ -15,6 +15,7 @@ from omegaconf import OmegaConf
 
 from sbdd_robust.analysis import figures as fig_mod
 from sbdd_robust.datasets.load_complexes import load_pocket_from_complex
+from sbdd_robust.datasets.pocket import Pocket
 from sbdd_robust import provenance as provenance_mod
 from sbdd_robust.metrics import brittleness_rate as br_rate_mod
 from sbdd_robust.metrics import chemistry as chem_mod
@@ -22,6 +23,7 @@ from sbdd_robust.metrics import robustness_score as rob_mod
 from sbdd_robust.models.base_adapter import BaseSBDDAdapter
 from sbdd_robust.models.diffsbdd_adapter import DiffSBDDAdapter
 from sbdd_robust.models.mock_adapter import MockSBDDAdapter
+from sbdd_robust.models.pocket2mol_adapter import Pocket2MolAdapter
 from sbdd_robust.perturbations.invariant import atom_shuffle, coordinate_jitter, crop_radius
 from sbdd_robust.perturbations.meaningful import residue_mutation as residue_mut
 
@@ -56,6 +58,18 @@ def _build_adapter(cfg: Any, pocket_cfg: Any, root: Path) -> BaseSBDDAdapter:
             batch_size=mcfg.get("batch_size"),
             all_frags=bool(mcfg.get("all_frags", False)),
             num_nodes_lig=mcfg.get("num_nodes_lig"),
+        )
+    if typ == "pocket2mol":
+        ckpt = mcfg.get("checkpoint")
+        sp = mcfg.get("script_path")
+        extras = mcfg.get("extra_args")
+        return Pocket2MolAdapter(
+            repo_root=_resolve(root, mcfg.repo_root),
+            checkpoint=_resolve(root, ckpt) if ckpt else None,
+            python_exe=mcfg.get("python_exe"),
+            script_path=_resolve(root, sp) if sp else None,
+            extra_args=list(extras) if extras is not None else None,
+            sanitize=bool(mcfg.get("sanitize", True)),
         )
     raise ValueError(f"Unknown model.type: {typ}")
 
@@ -200,9 +214,13 @@ def cmd_run(args: argparse.Namespace) -> int:
         written = fig_mod.plot_all_metrics(summary, plot_names, fig_dir, prefix=f"run{run_id}")
         figure_paths = [str(p) for p in written]
 
+    mtype = str(cfg.model.get("type", "mock")).lower()
     diffsbdd_repo = None
-    if str(cfg.model.get("type", "mock")).lower() == "diffsbdd" and cfg.model.get("repo_root"):
+    pocket2mol_repo = None
+    if mtype == "diffsbdd" and cfg.model.get("repo_root"):
         diffsbdd_repo = _resolve(root, cfg.model.repo_root)
+    if mtype == "pocket2mol" and cfg.model.get("repo_root"):
+        pocket2mol_repo = _resolve(root, cfg.model.repo_root)
 
     meta = {
         "run_id": run_id,
@@ -216,7 +234,11 @@ def cmd_run(args: argparse.Namespace) -> int:
             "brittle_pocket_model_pairs": br_stats["brittle_pairs"],
             "total_pocket_model_pairs": br_stats["total_pairs"],
         },
-        "git_provenance": provenance_mod.collect_git_provenance(sbdd_repo_root, diffsbdd_repo),
+        "git_provenance": provenance_mod.collect_git_provenance(
+            sbdd_repo_root,
+            diffsbdd_repo=diffsbdd_repo,
+            pocket2mol_repo=pocket2mol_repo,
+        ),
     }
     (results_dir / f"run_meta__{run_id}.json").write_text(json.dumps(meta, indent=2))
 

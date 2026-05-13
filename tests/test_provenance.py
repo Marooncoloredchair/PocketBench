@@ -9,3 +9,4 @@ def test_collect_git_provenance_shape():
     assert d["sbdd_robust_repo_root"]
     assert "sbdd_robust_commit" in d
     assert d.get("diffsbdd_repo_root") is None
+    assert d.get("pocket2mol_repo_root") is None
