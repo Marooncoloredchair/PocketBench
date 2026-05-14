@@ -127,8 +127,6 @@ def main() -> None:
     cfg["sample"]["num_samples"] = int(args.num_samples)
 
     if os.environ.get("SBDD_BRIDGE_DEBUG"):
-        import sys
-
         print("[sbdd_bridge_debug] base_config:", base_cfg, file=sys.stderr, flush=True)
         print("[sbdd_bridge_debug] merged sample:", cfg.get("sample"), file=sys.stderr, flush=True)
 
