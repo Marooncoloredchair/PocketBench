@@ -289,7 +289,7 @@ def main() -> None:
             "extra_args": [],
         },
     }
-    out = root / "configs" / "pocket2mol_real47.yaml"
+    out = root / "configs" / "experiments" / "pocket2mol_real47.yaml"
     out.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
     print("Wrote", out, "n_pockets=", len(pocket_rows))
 

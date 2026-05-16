@@ -27,4 +27,7 @@ Write-Host "PYTHONPATH=$($env:PYTHONPATH)"
 Write-Host "Logging to $log"
 Write-Host "Tip: close extra Python/jobs hammering CUDA, then rely on this single run."
 
+& $Py311 -m pip install -e $RepoRoot -q
+if ($LASTEXITCODE -ne 0) { Write-Error "pip install -e sbdd-robust failed (exit $LASTEXITCODE)" }
+
 & $Py311 -u -m sbdd_robust run --config configs\pocket2mol_real47.yaml *>&1 | Tee-Object -FilePath $log

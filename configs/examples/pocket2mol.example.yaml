@@ -1,0 +1,47 @@
+# Pocket2Mol via sbdd_robust. Use pengxingang/Pocket2Mol + scripts/pocket2mol_sample_drug_bridge.py
+# (see POCKET2MOL_SETUP.md). Replace repo_root, checkpoint, python_exe, script_path.
+#
+#   python -m sbdd_robust run --config configs/examples/pocket2mol.example.yaml
+
+project_root: .
+seed: 0
+
+paths:
+  results: data/results
+  generations: data/generations
+
+extraction_radius: 12.0
+brittleness_std_threshold: 0.05
+invariant_tags:
+  - atom_shuffle
+  - coordinate_jitter
+
+pockets:
+  - id: smoke_pocket2mol
+    pdb: data/raw/smoke/shared_protein.pdb
+    ligand_chain: A
+    ligand_resseq: 99
+
+perturbations:
+  - tag: original
+    type: identity
+  - tag: atom_shuffle
+    type: atom_shuffle
+    seed: 0
+  - tag: coordinate_jitter
+    type: coordinate_jitter
+    sigma: 0.05
+    seed: 1
+
+model:
+  type: pocket2mol
+  n_samples: 4
+  repo_root: /path/to/Pocket2Mol
+  checkpoint: /path/to/pretrained_Pocket2Mol.pt
+  python_exe: /path/to/pocket2mol_env/bin/python
+  script_path: /path/to/sbdd-robust/scripts/pocket2mol_sample_drug_bridge.py
+  # Optional extra CLI passed after --checkpoint:
+  # extra_args:
+  #   - "--device"
+  #   - "cpu"
+  sanitize: true

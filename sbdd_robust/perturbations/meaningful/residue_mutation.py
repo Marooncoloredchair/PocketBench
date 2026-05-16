@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import re
-from typing import FrozenSet
+from typing import FrozenSet, Optional
 
 import numpy as np
 from Bio.Data import IUPACData
@@ -51,7 +51,13 @@ def _keep_atom_for_mutation(atom_name: str, target_one: str) -> bool:
     return an == "CB"
 
 
-def mutate_residue(pocket: Pocket, residue_id: str, target_aa: str) -> Pocket:
+def mutate_residue(
+    pocket: Pocket,
+    residue_id: str,
+    target_aa: str,
+    *,
+    perturbation_tag: Optional[str] = None,
+) -> Pocket:
     """
     Mutate one residue in the pocket atom table.
 
@@ -126,7 +132,10 @@ def mutate_residue(pocket: Pocket, residue_id: str, target_aa: str) -> Pocket:
     meta = copy.deepcopy(pocket.metadata)
     rid_safe = re.sub(r"[^\w.\-]+", "_", residue_id)
     meta["perturbation_type"] = "meaningful"
-    meta["perturbation_tag"] = f"mutate_{residue_id}_{t}"
+    if perturbation_tag:
+        meta["perturbation_tag"] = str(perturbation_tag)
+    else:
+        meta["perturbation_tag"] = f"mutate_{residue_id}_{t}"
     meta["mutation_residue_id"] = residue_id
     meta["mutation_target_aa"] = t
     meta["mutation_target_three"] = target_three

@@ -1,23 +1,16 @@
-# 47 RCSB pockets matching DiffSBDD run metrics_per_condition__run1778615375 (Colab real50 panel).
-# Regenerate with: python scripts/generate_pocket2mol_real47_yaml.py
-#
-# Upstream note: https://github.com/luost26/Pocket2Mol is not available; use pengxingang/Pocket2Mol
-# cloned to D:/obsfu/Pocket2Mol. Inference uses scripts/pocket2mol_sample_drug_bridge.py wrapping
-# sample_for_pdb.py. Download pretrained_Pocket2Mol.pt per Pocket2Mol/ckpt/README.md (Google Drive).
-#
-# Run (after conda env + checkpoint):
-#   conda activate pocket2mol
-#   cd D:/obsfu/sbdd-robust
-#   python -m sbdd_robust run --config configs/pocket2mol_real47.yaml
-#
+# DiffSBDD — 47-pocket paper panel (invariant suite matches pocket2mol_real47 / run1778615375).
+# Full rerun requires DiffSBDD install + env vars DIFFSBDD_REPO, DIFFSBDD_CHECKPOINT, DIFFSBDD_PYTHON.
+# Quick numbers: use frozen CSV + experiments/reproduce_table1.sh (default, no GPU).
+# See configs/experiments/README.md
 project_root: .
 seed: 0
-run_id: pocket2mol_real47
+run_id: diffsbdd_real47
 paths:
   results: data/results
   generations: data/generations
 extraction_radius: 8.0
-skip_failed_pockets: true
+# Strict: abort the whole run if any pocket×condition fails (ensures a “no SKIP” log).
+skip_failed_pockets: false
 brittleness_std_threshold: 0.05
 invariant_tags:
 - atom_shuffle
@@ -324,11 +317,11 @@ perturbations:
   type: crop_radius_minus
   delta_angstrom: 1.5
 model:
-  type: pocket2mol
+  type: diffsbdd
   n_samples: 20
-  repo_root: D:/obsfu/Pocket2Mol
-  checkpoint: D:/obsfu/Pocket2Mol/ckpt/pretrained_Pocket2Mol.pt
-  python_exe: D:/Miniforge/envs/pocket2mol/python.exe
-  script_path: D:/obsfu/sbdd-robust/scripts/pocket2mol_sample_drug_bridge.py
-  sanitize: true
-  extra_args: []
+  repo_root: ${env:DIFFSBDD_REPO}
+  checkpoint: ${env:DIFFSBDD_CHECKPOINT}
+  python_exe: ${env:DIFFSBDD_PYTHON}
+  resamplings: 10
+  jump_length: 1
+  sanitize: false

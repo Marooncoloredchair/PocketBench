@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -12,6 +13,26 @@ from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
 from omegaconf import OmegaConf
+
+
+def _register_cfg_resolvers() -> None:
+    """Allow ``${env:VAR}`` in YAML configs (used by experiments/diffsbdd_real47.yaml)."""
+
+    def _env_resolver(key: str) -> str:
+        val = os.environ.get(key)
+        if val is None or val == "":
+            raise ValueError(
+                f"Environment variable {key!r} is not set but is required by the config "
+                f"(${{env:{key}}}). For DiffSBDD 47-pocket reruns export DIFFSBDD_REPO, "
+                "DIFFSBDD_CHECKPOINT, and DIFFSBDD_PYTHON (see configs/experiments/README.md)."
+            )
+        return val
+
+    # replace=True: safe to call on repeated imports / reloads
+    OmegaConf.register_new_resolver("env", _env_resolver, replace=True)
+
+
+_register_cfg_resolvers()
 
 from sbdd_robust.analysis import figures as fig_mod
 from sbdd_robust.datasets.load_complexes import load_pocket_from_complex
@@ -74,7 +95,12 @@ def _build_adapter(cfg: Any, pocket_cfg: Any, root: Path) -> BaseSBDDAdapter:
     raise ValueError(f"Unknown model.type: {typ}")
 
 
-def _apply_perturbations(base: Pocket, specs: List[Dict[str, Any]]) -> List[Pocket]:
+def _apply_perturbations(
+    base: Pocket,
+    specs: List[Dict[str, Any]],
+    pocket_cfg: Dict[str, Any] | None = None,
+) -> List[Pocket]:
+    pc = pocket_cfg or {}
     out: List[Pocket] = []
     for spec in specs:
         tag = str(spec.get("tag", spec.get("type", "unknown")))
@@ -112,9 +138,19 @@ def _apply_perturbations(base: Pocket, specs: List[Dict[str, Any]]) -> List[Pock
             out.append(p)
             continue
         if typ == "residue_mutation":
-            rid = str(spec["residue_id"])
+            if spec.get("residue_id_from_pocket"):
+                rid = str(pc.get("mutation_residue_id", "")).strip()
+                if not rid:
+                    raise ValueError(
+                        "residue_id_from_pocket requires pocket entry field mutation_residue_id"
+                    )
+            else:
+                rid = str(spec["residue_id"])
             taa = str(spec["target_aa"])
-            p = residue_mut.mutate_residue(base, rid, taa)
+            ptag = spec.get("tag")
+            p = residue_mut.mutate_residue(
+                base, rid, taa, perturbation_tag=str(ptag) if ptag else None
+            )
             out.append(p)
             continue
         raise ValueError(f"Unknown perturbation type: {typ}")
@@ -161,13 +197,28 @@ def cmd_run(args: argparse.Namespace) -> int:
                 ligand_resseq=int(lr) if lr is not None else None,
             )
             adapter = _build_adapter(cfg, pc, root)
-            pert_pockets = _apply_perturbations(base_pocket, pert_specs)
+            pocket_cfg_dict: Dict[str, Any] = OmegaConf.to_container(pc, resolve=True)  # type: ignore[assignment]
+            pert_pockets = _apply_perturbations(base_pocket, pert_specs, pocket_cfg=pocket_cfg_dict)
             gen_root = _resolve(root, cfg.paths.generations) / f"run_{run_id}"
+            compute_dock = bool(cfg.get("compute_docking", False))
             for pock in pert_pockets:
                 wdir = gen_root / pid / str(pock.metadata.get("perturbation_tag", "unknown"))
                 wdir.mkdir(parents=True, exist_ok=True)
                 mols = adapter.generate(pock, n_samples=n_samples, workdir=wdir)
                 summary = chem_mod.summarize_molecules(mols)
+                if compute_dock and pock.ligand_centroid is not None:
+                    from sbdd_robust.metrics import docking as dock_mod
+
+                    n_cpu = int(cfg.get("vina_cpu", cfg.get("docking_n_cpu", 4)))
+                    scores = dock_mod.score_molecules(
+                        mols,
+                        pock,
+                        n_cpus=n_cpu,
+                        verbose=bool(cfg.get("docking_verbose", False)),
+                    )
+                    finite = [s for s in scores if s is not None and np.isfinite(s)]
+                    summary["vina_score_mean"] = float(np.mean(finite)) if finite else float("nan")
+                    summary["vina_score_std"] = float(np.std(finite)) if len(finite) > 1 else float("nan")
                 row = {
                     "pocket_id": pid,
                     "perturbation_type": pock.metadata.get("perturbation_type", ""),

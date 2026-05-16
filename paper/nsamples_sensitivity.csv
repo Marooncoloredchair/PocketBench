@@ -1,0 +1,5 @@
+run_label,tau,brittleness_rate,brittle_pairs,total_pairs
+n20,0.05,1.0,10,10
+n20,0.1,1.0,10,10
+n50,0.05,1.0,10,10
+n50,0.1,1.0,10,10

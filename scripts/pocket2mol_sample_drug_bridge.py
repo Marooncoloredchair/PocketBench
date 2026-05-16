@@ -112,8 +112,16 @@ def main() -> None:
     if not sample_py.is_file():
         raise FileNotFoundError(f"Expected {sample_py} — set --pocket2mol_root or POCKET2MOL_ROOT.")
 
-    base_cfg = args.base_config or (root / "configs" / "sample_for_pdb.yml")
-    with open(base_cfg, encoding="utf-8") as fh:
+    base_cfg_path = (
+        Path(args.base_config) if args.base_config else (root / "configs" / "sample_for_pdb.yml")
+    )
+    if not base_cfg_path.is_absolute():
+        base_cfg_path = (root / base_cfg_path).resolve()
+    if not base_cfg_path.is_file():
+        raise FileNotFoundError(
+            f"Base Pocket2Mol YAML not found: {base_cfg_path} (resolved under {root})"
+        )
+    with open(base_cfg_path, encoding="utf-8") as fh:
         cfg = yaml.safe_load(fh)
     ckpt = args.checkpoint.resolve()
     if not ckpt.is_file():
@@ -127,7 +135,7 @@ def main() -> None:
     cfg["sample"]["num_samples"] = int(args.num_samples)
 
     if os.environ.get("SBDD_BRIDGE_DEBUG"):
-        print("[sbdd_bridge_debug] base_config:", base_cfg, file=sys.stderr, flush=True)
+        print("[sbdd_bridge_debug] base_config:", base_cfg_path, file=sys.stderr, flush=True)
         print("[sbdd_bridge_debug] merged sample:", cfg.get("sample"), file=sys.stderr, flush=True)
 
     center, bbox_size = _pocket_center_and_bbox(Path(args.pdb_path))

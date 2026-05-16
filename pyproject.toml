@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "sbdd-robust"
 version = "0.1.0"
 description = "Benchmark brittleness of structure-based drug design generative models"
+readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = [
@@ -21,7 +22,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-vina = ["vina>=1.2.2"]
+vina = [
+  "meeko>=0.5.0",
+  "gemmi",
+  'vina>=1.2.2; platform_system != "Windows"',
+]
 dev = ["pytest>=7.4", "pytest-cov>=4.1"]
 
 [project.scripts]

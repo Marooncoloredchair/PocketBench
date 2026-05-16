@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software in research, please cite the article (preprint)
+  and this repository.
+title: SBDD-Robust
+version: 0.1.0
+license: MIT
+date-released: "2026-05-16"
+url: "https://github.com/Marooncoloredchair/PocketBench"
+repository-code: "https://github.com/Marooncoloredchair/PocketBench"
+type: software
+authors:
+  - family-names: Osborne
+    given-names: Terrell
+    affiliation: University of Rhode Island
+preferred-citation:
+  type: article
+  title: >-
+    Reliability of generative structure-based drug design models under
+    invariant pocket perturbations
+  authors:
+    - family-names: Osborne
+      given-names: Terrell
+      affiliation: University of Rhode Island
+  year: 2026
+  url: "https://www.biorxiv.org/content/[PLACEHOLDER]"
+  doi: "10.1101/[PLACEHOLDER]"

@@ -55,6 +55,10 @@ def _centroid_from_pdb_ligand_residue(pdb_path: Path, chain_id: str, resseq: int
     return np.stack(coords, axis=0).mean(axis=0)
 
 
+def ligand_centroid_from_pdb_residue(pdb_path: Path, chain_id: str, resseq: int) -> np.ndarray:
+    """Public alias for ligand heavy-atom centroid from a PDB ATOM/HETATM residue."""
+    return _centroid_from_pdb_ligand_residue(Path(pdb_path), chain_id, int(resseq))
+
 def extract_pocket(
     pdb_path: Path,
     ligand_sdf_path: Optional[Path] = None,

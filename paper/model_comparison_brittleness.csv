@@ -1,0 +1,5 @@
+metric_std_threshold,n_pockets_total_diffsbdd,n_covered_diffsbdd,coverage_rate_diffsbdd,n_pockets_total_pocket2mol,n_covered_pocket2mol,coverage_rate_pocket2mol,brittleness_rate_on_covered_diffsbdd,brittleness_rate_on_covered_pocket2mol,brittle_pairs_on_covered_diffsbdd,brittle_pairs_on_covered_pocket2mol,denominator_covered_diffsbdd,denominator_covered_pocket2mol,n_shared_covered_pockets
+0.05,47,47,1.0,47,13,0.2765957446808511,1.0,1.0,47,13,47,13,13
+0.1,47,47,1.0,47,13,0.2765957446808511,1.0,1.0,47,13,47,13,13
+0.15,47,47,1.0,47,13,0.2765957446808511,0.9787234042553191,1.0,46,13,47,13,13
+0.2,47,47,1.0,47,13,0.2765957446808511,0.9148936170212766,1.0,43,13,47,13,13

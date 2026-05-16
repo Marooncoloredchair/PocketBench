@@ -10,7 +10,7 @@
 #
 # Then:
 #   cd D:/obsfu/sbdd-robust
-#   python -m sbdd_robust run --config configs/diffsbdd.example.yaml
+#   python -m sbdd_robust run --config configs/examples/diffsbdd.example.yaml
 
 project_root: .
 seed: 0

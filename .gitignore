@@ -8,3 +8,17 @@ dist/
 build/
 .venv/
 venv/
+
+# Large / local run outputs
+data/generations/
+*.log
+paper/_runlog.txt
+paper/biorxiv_submission/*.aux
+paper/biorxiv_submission/*.bbl
+paper/biorxiv_submission/*.blg
+paper/biorxiv_submission/*.out
+paper/biorxiv_submission/*.toc
+paper/biorxiv_submission/*.synctex.gz
+paper/figures/_test.pdf
+paper/figures/test_agg.pdf
+paper/biorxiv_submission/main.pdf
