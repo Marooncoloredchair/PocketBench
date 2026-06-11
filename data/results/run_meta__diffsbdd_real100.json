@@ -1,0 +1,31 @@
+{
+  "run_id": "diffsbdd_real100",
+  "metrics_csv": "D:\\obsfu\\sbdd-robust\\data\\results\\metrics_per_condition__rundiffsbdd_real100.csv",
+  "flagged_csv": "D:\\obsfu\\sbdd-robust\\data\\results\\metrics_flagged__rundiffsbdd_real100.csv",
+  "summary_csv": "D:\\obsfu\\sbdd-robust\\data\\results\\robustness_summary__rundiffsbdd_real100.csv",
+  "figure_paths": [
+    "D:\\obsfu\\sbdd-robust\\data\\results\\figures\\rundiffsbdd_real100_validity.png",
+    "D:\\obsfu\\sbdd-robust\\data\\results\\figures\\rundiffsbdd_real100_uniqueness.png",
+    "D:\\obsfu\\sbdd-robust\\data\\results\\figures\\rundiffsbdd_real100_mean_qed.png"
+  ],
+  "n_rows": 46,
+  "brittleness_rate": 0.9,
+  "brittleness_counts": {
+    "brittle_pocket_model_pairs": 9,
+    "total_pocket_model_pairs": 10
+  },
+  "git_provenance": {
+    "sbdd_robust_repo_root": "D:\\obsfu\\sbdd-robust",
+    "sbdd_robust_commit": "68ac0955b216077464ce779c90f0e6429578c7ba",
+    "sbdd_robust_dirty": true,
+    "diffsbdd_repo_root": "D:\\obsfu\\DiffSBDD",
+    "diffsbdd_commit": "5d0d38d16c8932a0339fd2ce3f67ade98bbdff27",
+    "diffsbdd_dirty": true,
+    "pocket2mol_repo_root": null,
+    "pocket2mol_commit": null,
+    "pocket2mol_dirty": null,
+    "targetdiff_repo_root": null,
+    "targetdiff_commit": null,
+    "targetdiff_dirty": null
+  }
+}
