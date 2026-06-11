@@ -45,6 +45,7 @@ from sbdd_robust.models.base_adapter import BaseSBDDAdapter
 from sbdd_robust.models.diffsbdd_adapter import DiffSBDDAdapter
 from sbdd_robust.models.mock_adapter import MockSBDDAdapter
 from sbdd_robust.models.pocket2mol_adapter import Pocket2MolAdapter
+from sbdd_robust.models.targetdiff_adapter import TargetDiffAdapter
 from sbdd_robust.perturbations.invariant import atom_shuffle, coordinate_jitter, crop_radius
 from sbdd_robust.perturbations.meaningful import residue_mutation as residue_mut
 
@@ -65,6 +66,7 @@ def _build_adapter(cfg: Any, pocket_cfg: Any, root: Path) -> BaseSBDDAdapter:
         full_pdb = getattr(pocket_cfg, "full_pdb", None) or pocket_cfg.pdb
         ref = pocket_cfg.get("ref_ligand") or mcfg.get("ref_ligand")
         ref = str(ref).strip() if ref else None
+        extras = mcfg.get("extra_args")
         return DiffSBDDAdapter(
             repo_root=_resolve(root, mcfg.repo_root),
             checkpoint=_resolve(root, mcfg.checkpoint),
@@ -79,6 +81,7 @@ def _build_adapter(cfg: Any, pocket_cfg: Any, root: Path) -> BaseSBDDAdapter:
             batch_size=mcfg.get("batch_size"),
             all_frags=bool(mcfg.get("all_frags", False)),
             num_nodes_lig=mcfg.get("num_nodes_lig"),
+            extra_args=list(extras) if extras is not None else None,
         )
     if typ == "pocket2mol":
         ckpt = mcfg.get("checkpoint")
@@ -91,6 +94,22 @@ def _build_adapter(cfg: Any, pocket_cfg: Any, root: Path) -> BaseSBDDAdapter:
             script_path=_resolve(root, sp) if sp else None,
             extra_args=list(extras) if extras is not None else None,
             sanitize=bool(mcfg.get("sanitize", True)),
+        )
+    if typ == "targetdiff":
+        cfg_yml = mcfg.get("config_yaml") or mcfg.get("config")
+        if not cfg_yml:
+            raise ValueError("model.config_yaml (path to TargetDiff sampling YAML) is required for targetdiff")
+        sp = mcfg.get("script_path")
+        extras = mcfg.get("extra_args")
+        return TargetDiffAdapter(
+            repo_root=_resolve(root, mcfg.repo_root),
+            config_yaml=_resolve(root, cfg_yml),
+            python_exe=mcfg.get("python_exe"),
+            script_path=_resolve(root, sp) if sp else None,
+            device=str(mcfg.get("device", "cuda:0")),
+            batch_size=int(mcfg.get("batch_size", 100)),
+            sanitize=bool(mcfg.get("sanitize", True)),
+            extra_args=list(extras) if extras is not None else None,
         )
     raise ValueError(f"Unknown model.type: {typ}")
 
@@ -268,10 +287,13 @@ def cmd_run(args: argparse.Namespace) -> int:
     mtype = str(cfg.model.get("type", "mock")).lower()
     diffsbdd_repo = None
     pocket2mol_repo = None
+    targetdiff_repo = None
     if mtype == "diffsbdd" and cfg.model.get("repo_root"):
         diffsbdd_repo = _resolve(root, cfg.model.repo_root)
     if mtype == "pocket2mol" and cfg.model.get("repo_root"):
         pocket2mol_repo = _resolve(root, cfg.model.repo_root)
+    if mtype == "targetdiff" and cfg.model.get("repo_root"):
+        targetdiff_repo = _resolve(root, cfg.model.repo_root)
 
     meta = {
         "run_id": run_id,
@@ -289,6 +311,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             sbdd_repo_root,
             diffsbdd_repo=diffsbdd_repo,
             pocket2mol_repo=pocket2mol_repo,
+            targetdiff_repo=targetdiff_repo,
         ),
     }
     (results_dir / f"run_meta__{run_id}.json").write_text(json.dumps(meta, indent=2))

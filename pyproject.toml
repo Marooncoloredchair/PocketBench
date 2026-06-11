@@ -3,9 +3,9 @@ requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sbdd-robust"
+name = "pocketbench"
 version = "0.1.0"
-description = "Benchmark brittleness of structure-based drug design generative models"
+description = "PocketBench: a perturbation-based reliability benchmark for structure-based drug design generative models"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -19,6 +19,7 @@ dependencies = [
   "torch>=2.0",
   "pyyaml>=6.0",
   "omegaconf>=2.3",
+  "scipy>=1.10",
 ]
 
 [project.optional-dependencies]
@@ -30,6 +31,7 @@ vina = [
 dev = ["pytest>=7.4", "pytest-cov>=4.1"]
 
 [project.scripts]
+pocketbench = "sbdd_robust.cli:main"
 sbdd-robust = "sbdd_robust.cli:main"
 
 [tool.setuptools.packages.find]

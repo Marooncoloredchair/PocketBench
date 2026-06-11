@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: >-
   If you use this software in research, please cite the article (preprint)
   and this repository.
-title: SBDD-Robust
+title: PocketBench
 version: 0.1.0
 license: MIT
 date-released: "2026-05-16"

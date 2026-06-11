@@ -22,3 +22,10 @@ paper/biorxiv_submission/*.synctex.gz
 paper/figures/_test.pdf
 paper/figures/test_agg.pdf
 paper/biorxiv_submission/main.pdf
+
+# Internal planning / submission scratch docs (kept local, not for public repo)
+NMI_PROGRESS.md
+paper/NMI_SUBMISSION_CHECKLIST.md
+paper/nmi_cover_letter.md
+paper/results_stub.md
+data/results/*_run_log.txt

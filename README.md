@@ -1,6 +1,8 @@
-# SBDD-Robust
+# PocketBench
 
-**SBDD-Robust** is an open-source benchmark toolkit for measuring **reliability** of structure-based drug design (SBDD) generative models under **pocket perturbations** that preserve chemistry but change featurization (atom order, coordinate jitter, crop radius). Plug in your model with a small adapter, run on any set of PDB complexes, and get **brittleness rates**, **coverage**, chemistry metrics, and optional **docking** scores—typically in one afternoon once your backend is wired.
+**PocketBench** is an open-source benchmark toolkit for measuring **reliability** of structure-based drug design (SBDD) generative models under **pocket perturbations** that preserve chemistry but change featurization (atom order, coordinate jitter, crop radius). Plug in your model with a small adapter, run on any set of PDB complexes, and get **brittleness rates**, **coverage**, chemistry metrics, and optional **docking** scores—typically in one afternoon once your backend is wired.
+
+> The importable Python package and CLI module are named **`sbdd_robust`** (e.g. `python -m sbdd_robust`); the project/repository is **PocketBench**.
 
 The goal: if someone training a new SBDD model can run
 
@@ -60,7 +62,7 @@ Details: **`configs/experiments/README.md`**.
 | `sbdd_robust/` | Importable library + `python -m sbdd_robust` CLI (**the tool**). |
 | `configs/examples/` | Small configs for new users and CI. |
 | `configs/experiments/` | Full paper configs (47-pocket panel, meaningful runs, …). |
-| `data/raw/` | Input PDBs (`real50/` panel, `smoke/`, …). |
+| `data/raw/` | Input PDBs: `real50/` (47-complex paper invariant panel), `real100/` (expanded 100-pocket panel), `smoke/` (tiny synthetic). |
 | `data/results/` | Frozen paper CSVs and run logs. |
 | `paper/` | Manuscript, figures, LaTeX (`paper/biorxiv_submission/`). |
 | `experiments/` | Shell scripts that reproduce paper outputs. |
@@ -71,6 +73,15 @@ Details: **`configs/experiments/README.md`**.
 
 If you use this software, cite the **bioRxiv preprint** (update DOI when posted) and the repository. GitHub reads **`CITATION.cff`** for the “Cite this repository” widget.
 
+## Acknowledgements & third-party code
+
+PocketBench evaluates external generative models through thin adapters; it does **not** redistribute their weights. We gratefully build on:
+
+- **DiffSBDD** — Schneuing, A. *et al.* "Structure-based drug design with equivariant diffusion models." Repository: <https://github.com/arneschneuing/DiffSBDD> (MIT License). The Colab pipeline applies small, clearly marked **derivative patches** to upstream DiffSBDD files (e.g. `generate_ligands.py`: `torch.load` compatibility shim and a `--device` flag) at runtime; these are modifications of the original MIT-licensed sources and are credited to the DiffSBDD authors.
+- **Pocket2Mol** — Peng, X. *et al.* Repository: <https://github.com/pengxingang/Pocket2Mol>. See `POCKET2MOL_SETUP.md`.
+
+If you use the corresponding model in your run, please cite that model's paper in addition to PocketBench.
+
 ## License
 
-MIT — see **`LICENSE`**.
+MIT — see **`LICENSE`**. Third-party models retain their own licenses.

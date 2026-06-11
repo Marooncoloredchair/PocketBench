@@ -16,6 +16,24 @@ Export before `python -m sbdd_robust run --config configs/experiments/diffsbdd_r
 - `DIFFSBDD_REPO` — root of the DiffSBDD clone (contains `generate_ligands.py` and checkpoints).
 - `DIFFSBDD_CHECKPOINT` — path to `.ckpt` (e.g. `.../crossdocked_fullatom_cond.ckpt`).
 - `DIFFSBDD_PYTHON` — Python executable in the **DiffSBDD** conda/env (not necessarily the `sbdd-robust` env).
+  **`generate_ligands.py` imports `openbabel`; you must point this at an interpreter where that succeeds.** On a typical DiffSBDD install that is the conda env named `diffsbdd` from `environment.yaml`, *not* the base Miniforge `python.exe`.
+
+Example (adjust drive/paths):
+
+```powershell
+$env:DIFFSBDD_REPO       = 'D:\obsfu\DiffSBDD'
+$env:DIFFSBDD_CHECKPOINT = 'D:\obsfu\DiffSBDD\checkpoints\crossdocked_fullatom_cond.ckpt'
+$env:DIFFSBDD_PYTHON    = 'D:\Miniforge\envs\diffsbdd\python.exe'
+```
+
+**NumPy 2 / `np.float_` errors (wandb × PyTorch Lightning).**  
+If the DiffSBDD subprocess traceback mentions ``np.float_ was removed``, the **`diffsbdd`** env likely upgraded to NumPy 2+. Re-pin NumPy 1.26.x (matches DiffSBDD `environment.yaml`):
+
+```powershell
+& 'D:\Miniforge\envs\diffsbdd\python.exe' -m pip install 'numpy>=1.26,<2'
+```
+
+(use your env’s Python path).
 
 The config uses OmegaConf interpolation: `repo_root: ${env:DIFFSBDD_REPO}`, etc.
 

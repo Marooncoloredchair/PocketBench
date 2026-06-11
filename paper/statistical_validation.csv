@@ -1,0 +1,11 @@
+test,contrast,n_paired_pockets,statistic,p_value,note
+paired_wilcoxon_validity_delta,original_vs_atom_shuffle,47,73.0,0.8611225849088081,Wilcoxon signed-rank on (validity_pert - validity_orig) per pocket.
+paired_wilcoxon_validity_delta,original_vs_coordinate_jitter,47,111.0,0.8699321581153807,Wilcoxon signed-rank on (validity_pert - validity_orig) per pocket.
+paired_wilcoxon_validity_delta,original_vs_crop_radius_plus_1.5,47,77.0,0.2653734941706778,Wilcoxon signed-rank on (validity_pert - validity_orig) per pocket.
+paired_wilcoxon_validity_delta,original_vs_crop_radius_minus_1.5,47,74.0,0.9027070108883808,Wilcoxon signed-rank on (validity_pert - validity_orig) per pocket.
+onesample_t_mean_abs_validity_delta_jitter,coordinate_jitter_vs_original,47,5.532296016356901,7.228354322181587e-07,"H0 mean|valid_jitter-valid_orig|=0 alternative greater; mean_MAD=0.0276596; CI95(mean_MAD)=(0.0175958,0.0377234)"
+wilcoxon_validity_sigma_across_four_stresses,atom_shuffle+jitter+crop+/crop- only,47,465.0,7.285297694668175e-07,Wilcoxon signed-rank on pocket sigma(validity across four invariant stresses); alternative median sigma > 0; sigma ddof=0 matches brittle-flag code; median_sigma=0.0216506
+bootstrap_brittleness_rate,tau=0.1,47,1.0,,"Bootstrap 95% CI on brittle fraction: [1.0000, 1.0000]"
+bootstrap_ci_low,tau=0.1,47,1.0,,2.5th percentile brittle-fraction bootstrap
+bootstrap_ci_high,tau=0.1,47,1.0,,97.5th percentile brittle-fraction bootstrap
+permutation_iid_pool_validity_sigma_vs_p95_null,n_perm=1000; four_IID_draws_from_pooled_validities,47,0.0,,IID with-replacement quartet per pseudopocket-row from pooled 47 x 4 (1000 reps); upper-tail fraction counts obs_sigma > row p95 of null. Values near zero indicate cohesion (typical IID draws are MORE dispersed than curated pocket rows).

@@ -47,6 +47,7 @@ def collect_git_provenance(
     sbdd_robust_repo: Path,
     diffsbdd_repo: Optional[Path] = None,
     pocket2mol_repo: Optional[Path] = None,
+    targetdiff_repo: Optional[Path] = None,
 ) -> dict[str, Any]:
     sbdd_robust_repo = Path(sbdd_robust_repo).resolve()
     out: dict[str, Any] = {
@@ -72,4 +73,13 @@ def collect_git_provenance(
         out["pocket2mol_repo_root"] = None
         out["pocket2mol_commit"] = None
         out["pocket2mol_dirty"] = None
+    if targetdiff_repo is not None:
+        tr = Path(targetdiff_repo).resolve()
+        out["targetdiff_repo_root"] = str(tr)
+        out["targetdiff_commit"] = git_commit(tr)
+        out["targetdiff_dirty"] = git_is_dirty(tr)
+    else:
+        out["targetdiff_repo_root"] = None
+        out["targetdiff_commit"] = None
+        out["targetdiff_dirty"] = None
     return out

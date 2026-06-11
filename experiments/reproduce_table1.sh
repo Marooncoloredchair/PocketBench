@@ -27,8 +27,10 @@ if [[ ! -f "$METRICS_CSV" ]]; then
 fi
 
 echo "==> [reproduce_table1] Threshold sensitivity → $OUT_CSV , $OUT_FIG"
+POCKET2MOL_CSV="${SBDD_ROBUST_POCKET2MOL_METRICS_CSV:-$ROOT/data/results/metrics_per_condition__runpocket2mol_real47_full.csv}"
 python analysis/threshold_sensitivity.py \
   --metrics "$METRICS_CSV" \
+  --pocket2mol-metrics "$POCKET2MOL_CSV" \
   --out-csv "$OUT_CSV" \
   --out-figure "$OUT_FIG"
 

@@ -23,6 +23,8 @@ import pandas as pd
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
+sys.path.insert(0, str(_REPO_ROOT / "paper" / "figures"))
+from nmi_style import COLOR_DIFFSBDD, COLOR_POCKET2MOL, figsize_tripanel, save_figure, setup_rc
 
 from sbdd_robust.metrics.brittleness_rate import brittleness_rate_from_flagged
 from sbdd_robust.metrics.robustness_score import flag_invariant_brittleness
@@ -235,11 +237,11 @@ def main() -> int:
     out_pdf = args.out_pdf.resolve()
     out_pdf.parent.mkdir(parents=True, exist_ok=True)
 
+    setup_rc(False)
     fig, (ax0, ax1, ax2) = plt.subplots(
-        3,
         1,
-        figsize=(7.0, 8.8),
-        height_ratios=[1.15, 1.0, 0.95],
+        3,
+        figsize=figsize_tripanel(),
         constrained_layout=True,
         facecolor="white",
     )
@@ -247,13 +249,16 @@ def main() -> int:
         ax.set_facecolor("white")
     w = 0.36
     x = np.arange(len(THRESHOLDS), dtype=float)
-    ax0.bar(x - w / 2, rates_d_cov, width=w, label="DiffSBDD", color="#1f77b4")
-    ax0.bar(x + w / 2, rates_p_cov, width=w, label="Pocket2Mol", color="#ff7f0e")
+    ax0.bar(x - w / 2, rates_d_cov, width=w, label="DiffSBDD", color=COLOR_DIFFSBDD)
+    ax0.bar(x + w / 2, rates_p_cov, width=w, label="Pocket2Mol", color=COLOR_POCKET2MOL)
     ax0.set_xticks(x)
     ax0.set_xticklabels([str(t) for t in THRESHOLDS])
-    ax0.set_xlabel(r"Invariant metric std threshold $\tau$ (unitless)")
+    ax0.set_xlabel(r"Featurization metric-SD threshold $\tau$ (unitless)")
     ax0.set_ylabel("Brittleness rate (dimensionless)")
-    ax0.set_title("Brittleness on covered pockets (original $n_{\\mathrm{valid}}>0$)")
+    ax0.set_title(
+        "Brittleness on covered pockets (original n_valid>0)",
+        fontweight="normal",
+    )
     ax0.set_ylim(
         0,
         max(1.0, max(rates_d_cov + rates_p_cov) * 1.08) if (rates_d_cov + rates_p_cov) else 1.0,
@@ -265,59 +270,76 @@ def main() -> int:
         [0 - w / 2, 0 + w / 2],
         [mean_v_d, mean_v_p],
         width=w,
-        color=["#1f77b4", "#ff7f0e"],
+        color=[COLOR_DIFFSBDD, COLOR_POCKET2MOL],
     )
-    ax1.set_xticks([0])
-    ax1.set_xticklabels(["Mean validity\n(original)"])
+    ax1.set_xticks([0 - w / 2, 0 + w / 2])
+    ax1.set_xticklabels(["DiffSBDD", "Pocket2Mol"], fontsize=11)
     ax1.set_ylabel("Validity (fraction)")
-    ax1.set_title(f"Original-condition validity (mean; {validity_note})")
-    ax1.set_xlim(-0.6, 0.6)
-    ax1.set_ylim(0, 1.05)
-    for xi, val, lab in zip(
-        [-w / 2, w / 2],
-        [mean_v_d, mean_v_p],
-        ["DiffSBDD", "Pocket2Mol"],
-    ):
-        ax1.text(xi, val + 0.02, f"{lab}\n{val:.3f}", ha="center", va="bottom", fontsize=9)
+    ax1.set_title(f"Original-condition validity (mean; {validity_note})", fontweight="normal")
+    ax1.set_xlim(-0.55, 0.55)
+    ax1.set_ylim(0, 1.12)
+    for xpos, val in zip([0 - w / 2, 0 + w / 2], [mean_v_d, mean_v_p]):
+        if val >= 0.55:
+            y_text = val * 0.52
+            color = "white"
+            va = "center"
+        else:
+            y_text = val + 0.035
+            color = "#222"
+            va = "bottom"
+        ax1.text(
+            xpos,
+            y_text,
+            f"{val:.3f}",
+            ha="center",
+            va=va,
+            fontsize=10,
+            color=color,
+            fontweight="bold",
+        )
 
     ax2.bar(
         [0 - w / 2, 0 + w / 2],
         [cov_rate_d, cov_rate_p],
         width=w,
-        color=["#1f77b4", "#ff7f0e"],
+        color=[COLOR_DIFFSBDD, COLOR_POCKET2MOL],
     )
-    ax2.set_xticks([0])
-    ax2.set_xticklabels(["Generation coverage"])
+    ax2.set_xticks([0 - w / 2, 0 + w / 2])
+    ax2.set_xticklabels(["DiffSBDD", "Pocket2Mol"], fontsize=11)
     ax2.set_ylabel("Coverage (dimensionless)")
-    ax2.set_title("Coverage: original condition produced ≥1 valid molecule")
-    ax2.set_xlim(-0.6, 0.6)
-    ax2.set_ylim(0, 1.05)
-    for xi, rate, n_cov, n_tot, lab in zip(
-        [-w / 2, w / 2],
+    ax2.set_title("Coverage: original condition produced at least one valid molecule", fontweight="normal")
+    ax2.set_xlim(-0.55, 0.55)
+    ax2.set_ylim(0, 1.12)
+    for xi, rate, n_cov, n_tot in zip(
+        [0 - w / 2, 0 + w / 2],
         [cov_rate_d, cov_rate_p],
         [n_cov_d, n_cov_p],
         [n_tot_d, n_tot_p],
-        ["DiffSBDD", "Pocket2Mol"],
     ):
+        label = f"{n_cov}/{n_tot}\n({rate:.2f})"
+        if rate >= 0.55:
+            y_text = rate * 0.45
+            color = "white"
+            va = "center"
+        else:
+            y_text = rate + 0.04
+            color = "#222"
+            va = "bottom"
         ax2.text(
             xi,
-            rate + 0.02,
-            f"{lab}\n{n_cov}/{n_tot}\n({rate:.2f})",
+            y_text,
+            label,
             ha="center",
-            va="bottom",
+            va=va,
             fontsize=9,
+            color=color,
+            linespacing=1.1,
         )
 
-    fig.patch.set_facecolor("white")
-    fig.savefig(
-        out_pdf,
-        format="pdf",
-        dpi=300,
-        facecolor="white",
-        bbox_inches="tight",
-    )
+    pdf, png = save_figure(fig, out_pdf.parent / out_pdf.stem)
     plt.close(fig)
-    print(f"Wrote {out_pdf}")
+    print(f"Wrote {pdf}")
+    print(f"Wrote {png}")
     print(
         f"Mean validity (original, {validity_note}): "
         f"DiffSBDD={mean_v_d:.4f}, Pocket2Mol={mean_v_p:.4f}"

@@ -1,0 +1,33 @@
+# Example TargetDiff benchmark config. Clone https://github.com/guanjq/targetdiff and set paths.
+# Sampling uses scripts/sample_for_pocket.py (see TARGETDIFF_SETUP.md).
+project_root: .
+seed: 0
+run_id: targetdiff_smoke
+paths:
+  results: data/results
+  generations: data/generations
+extraction_radius: 8.0
+skip_failed_pockets: true
+brittleness_std_threshold: 0.10
+invariant_tags:
+  - atom_shuffle
+  - coordinate_jitter
+  - crop_radius_plus_1.5
+  - crop_radius_minus_1.5
+pockets: []
+perturbations:
+  - { tag: original, type: identity }
+  - { tag: atom_shuffle, type: atom_shuffle, seed: 0 }
+  - { tag: coordinate_jitter, type: coordinate_jitter, sigma: 0.1, seed: 1 }
+  - { tag: crop_radius_plus_1.5, type: crop_radius_plus, delta_angstrom: 1.5 }
+  - { tag: crop_radius_minus_1.5, type: crop_radius_minus, delta_angstrom: 1.5 }
+model:
+  type: targetdiff
+  n_samples: 20
+  repo_root: ${env:TARGETDIFF_REPO}
+  config_yaml: ${env:TARGETDIFF_SAMPLING_YAML}
+  python_exe: ${env:TARGETDIFF_PYTHON}
+  device: cuda:0
+  batch_size: 100
+  sanitize: true
+  extra_args: []

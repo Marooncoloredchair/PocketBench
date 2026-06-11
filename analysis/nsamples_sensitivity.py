@@ -77,7 +77,17 @@ def _plot_sensitivity(df: Path | pd.DataFrame, out_pdf: Path) -> None:
     taus = sorted(table["tau"].unique())
     x = range(len(taus))
     w = 0.35
-    fig, ax = plt.subplots(figsize=(5.5, 3.8), facecolor="white")
+    plt.rcParams.update(
+        {
+            "font.size": 12,
+            "axes.titlesize": 13,
+            "axes.labelsize": 12,
+            "xtick.labelsize": 11,
+            "ytick.labelsize": 11,
+            "legend.fontsize": 11,
+        }
+    )
+    fig, ax = plt.subplots(figsize=(6.2, 4.1), facecolor="white")
     ax.set_facecolor("white")
     colors = {"n20": "#1f77b4", "n50": "#ff7f0e"}
     for i, lab in enumerate(["n20", "n50"]):

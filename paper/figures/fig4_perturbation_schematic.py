@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Figure 4: Schematic — one pocket passing through four invariant transforms."""
+"""Figure 4: Schematic — one pocket passing through four featurization stress transforms."""
 
 from __future__ import annotations
 
@@ -18,13 +18,14 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    fig, ax = plt.subplots(figsize=(10, 2.4), facecolor="white")
+    plt.rcParams.update({"font.size": 11})
+    fig, ax = plt.subplots(figsize=(10.5, 2.85), facecolor="white")
     ax.set_facecolor("white")
     ax.set_xlim(0, 11)
-    ax.set_ylim(0, 2.2)
+    ax.set_ylim(0, 2.55)
     ax.axis("off")
 
-    def box(cx, text, w=1.55, h=0.95, fc="#e8f4fc", ec="#1f77b4"):
+    def box(cx, text, w=1.55, h=1.05, fc="#e8f4fc", ec="#1f77b4"):
         x = cx - w / 2
         y = 0.55
         p = FancyBboxPatch(
@@ -32,12 +33,12 @@ def main() -> int:
             w,
             h,
             boxstyle="round,pad=0.02,rounding_size=0.06",
-            linewidth=1.3,
+            linewidth=1.45,
             edgecolor=ec,
             facecolor=fc,
         )
         ax.add_patch(p)
-        ax.text(cx, y + h / 2, text, ha="center", va="center", fontsize=8.5)
+        ax.text(cx, y + h / 2, text, ha="center", va="center", fontsize=10.5, linespacing=1.15)
 
     centers = [1.0, 3.0, 5.0, 7.0, 9.0]
     texts = [
@@ -52,22 +53,23 @@ def main() -> int:
         box(cx, txt, fc=fc, ec=ec)
 
     for i in range(len(centers) - 1):
+        y_mid = 0.55 + 1.05 / 2
         a = FancyArrowPatch(
-            (centers[i] + 0.78, 1.02),
-            (centers[i + 1] - 0.78, 1.02),
+            (centers[i] + 0.78, y_mid),
+            (centers[i + 1] - 0.78, y_mid),
             arrowstyle="->",
-            mutation_scale=12,
+            mutation_scale=14,
             color="#222",
-            linewidth=1.0,
+            linewidth=1.15,
         )
         ax.add_patch(a)
 
     ax.text(
         5.5,
-        1.85,
-        "Invariant-style featurization and pocket-definition perturbations (same chemistry, altered tensor)",
+        2.18,
+        "Nominally chemistry-preserving pocket featurization / definition stress (same structure file, altered tensor)",
         ha="center",
-        fontsize=9,
+        fontsize=10,
         style="italic",
         color="#333",
     )

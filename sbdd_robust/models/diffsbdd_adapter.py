@@ -8,7 +8,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from rdkit import Chem
 
@@ -51,6 +51,7 @@ class DiffSBDDAdapter(BaseSBDDAdapter):
         batch_size: Optional[int] = None,
         all_frags: bool = False,
         num_nodes_lig: Optional[int] = None,
+        extra_args: Optional[Sequence[str]] = None,
     ):
         self.repo_root = Path(repo_root).resolve()
         self.checkpoint = Path(checkpoint).resolve()
@@ -65,6 +66,7 @@ class DiffSBDDAdapter(BaseSBDDAdapter):
         self.batch_size = int(batch_size) if batch_size is not None else None
         self.all_frags = bool(all_frags)
         self.num_nodes_lig = int(num_nodes_lig) if num_nodes_lig is not None else None
+        self.extra_args = list(extra_args or [])
         script = self.repo_root / "generate_ligands.py"
         if not script.is_file():
             raise FileNotFoundError(f"DiffSBDD generate_ligands.py not found at {script}")
@@ -134,6 +136,9 @@ class DiffSBDDAdapter(BaseSBDDAdapter):
 
         if self.timesteps is not None:
             argv.extend(["--timesteps", str(self.timesteps)])
+
+        if self.extra_args:
+            argv.extend(str(x) for x in self.extra_args)
 
         argv_path = workdir / "_sbdd_robust_diffsbdd_argv.json"
         argv_path.write_text(json.dumps(argv), encoding="utf-8")

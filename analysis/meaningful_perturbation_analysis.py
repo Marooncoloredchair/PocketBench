@@ -226,9 +226,19 @@ def main() -> int:
         args.summary_out.parent.mkdir(parents=True, exist_ok=True)
         args.heatmap_out.parent.mkdir(parents=True, exist_ok=True)
         summary.to_csv(args.summary_out, index=False)
-        sns.set_theme(style="white", context="notebook")
-        fig_h = max(4.0, 0.35 * len(heat_df))
-        fig, ax = plt.subplots(figsize=(10, fig_h))
+        sns.set_theme(style="white")
+        sns.set_context("paper", font_scale=1.35)
+        plt.rcParams.update(
+            {
+                "axes.titlesize": 13,
+                "axes.labelsize": 12,
+                "xtick.labelsize": 9.5,
+                "ytick.labelsize": 10,
+            }
+        )
+        fig_h = max(5.2, 0.42 * len(heat_df))
+        fig_w = max(11.5, min(14.0, 7.5 + 0.12 * heat_df.shape[1]))
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
         arr = heat_df.values
         finite = arr[np.isfinite(arr)]
         vmax = float(np.nanpercentile(np.abs(finite), 95)) if finite.size else 0.15
@@ -240,17 +250,21 @@ def main() -> int:
             center=0.0,
             vmin=-vmax,
             vmax=vmax,
-            linewidths=0.5,
-            linecolor="0.85",
-            cbar_kws={"label": "delta vs original"},
+            linewidths=0.55,
+            linecolor="0.88",
+            cbar_kws={"label": r"$\Delta$ vs original (same units as metric)"},
         )
+        cb = ax.collections[0].colorbar
+        if cb is not None:
+            cb.ax.tick_params(labelsize=10)
         ax.set_title(
-            "Meaningful perturbation metric deltas vs original"
-            + (" (no Vina)" if args.no_vina else "")
+            "Meaningful pocket mutations: metric deltas vs original (DiffSBDD)"
+            + (" — Vina omitted" if args.no_vina else "")
         )
-        plt.xticks(rotation=45, ha="right")
+        ax.tick_params(axis="y", which="major", labelsize=10)
+        plt.xticks(rotation=35, ha="right")
         plt.tight_layout()
-        fig.savefig(args.heatmap_out, dpi=200, bbox_inches="tight")
+        fig.savefig(args.heatmap_out, dpi=300, bbox_inches="tight")
         plt.close(fig)
         print(f"Wrote {args.summary_out}")
         print(f"Wrote {args.heatmap_out}")

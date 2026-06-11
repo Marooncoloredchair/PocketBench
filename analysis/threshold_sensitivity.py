@@ -5,7 +5,10 @@ Recompute brittleness_rate at several std thresholds without re-running generati
 Uses the same logic as ``sbdd_robust.metrics.robustness_score.flag_invariant_brittleness`` on
 ``metrics_per_condition__run*.csv`` (or ``metrics_flagged__*`` with brittle columns stripped).
 
-``robustness_summary__*.csv`` is optional: cross-checks rates (should match) via *_inv_std columns.
+Plots DiffSBDD and Pocket2Mol on one axis (blue / orange); Pocket2Mol rates are computed on
+**covered** pockets only (original $n_{\\mathrm{valid}}>0$).
+
+``robustness_summary__*.csv`` is optional: cross-checks DiffSBDD rates (should match) via *_inv_std columns.
 """
 
 from __future__ import annotations
@@ -22,11 +25,25 @@ import pandas as pd
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(_ROOT / "paper" / "figures"))
+from nmi_style import (
+    COLOR_DIFFSBDD,
+    COLOR_POCKET2MOL,
+    figsize_single,
+    save_figure,
+    setup_rc,
+)
 
 from sbdd_robust.metrics.brittleness_rate import brittleness_rate_from_flagged
 from sbdd_robust.metrics.robustness_score import flag_invariant_brittleness
 
+# Include τ = 0.05, 0.10, 0.15, 0.20 for alignment with Table 1 plus intermediates for curve shape.
 DEFAULT_THRESHOLDS = (0.03, 0.05, 0.08, 0.10, 0.15, 0.20)
+
+# Axes limits (slight padding beyond first/last τ so markers are not clipped).
+DEFAULT_XLIM = (0.025, 0.205)
+DEFAULT_XTICKS = (0.05, 0.10, 0.15, 0.20)
+DEFAULT_FIGSIZE_IN = figsize_single()
 
 DEFAULT_INVARIANT_TAGS = (
     "atom_shuffle",
@@ -42,6 +59,25 @@ def load_metrics_csv(path: Path) -> pd.DataFrame:
         if col in df.columns:
             df = df.drop(columns=[col])
     return df
+
+
+def _norm_pid(s: pd.Series | np.ndarray) -> pd.Series:
+    return s.astype(str).str.strip()
+
+
+def _good_original_pocket_ids(df: pd.DataFrame) -> set[str]:
+    """Pockets with at least one valid molecule on the original (reference) condition."""
+    tag_col = "perturbation_tag" if "perturbation_tag" in df.columns else "perturbation_type"
+    o = df[_norm_pid(df[tag_col]) == "original"].copy()
+    if o.empty:
+        return set()
+    nv = pd.to_numeric(o["n_valid"], errors="coerce").fillna(0)
+    o = o.assign(_nv=nv)
+    return set(_norm_pid(o.loc[o["_nv"] > 0, "pocket_id"]))
+
+
+def _filter_pockets(df: pd.DataFrame, pocket_ids: set[str]) -> pd.DataFrame:
+    return df[_norm_pid(df["pocket_id"]).isin(pocket_ids)].copy()
 
 
 def brittleness_vs_thresholds(
@@ -107,34 +143,50 @@ def validate_against_summary(
             )
 
 
-def plot_curve(table: pd.DataFrame, out_pdf: Path) -> None:
-    """Figure 1: DiffSBDD brittleness vs τ (blue, 300 dpi, white background)."""
+def plot_curve(
+    table_diffsbdd: pd.DataFrame,
+    table_pocket2mol: pd.DataFrame,
+    out_pdf: Path,
+    *,
+    xlim: tuple[float, float] = DEFAULT_XLIM,
+    xticks: tuple[float, ...] = DEFAULT_XTICKS,
+    figsize: tuple[float, float] = DEFAULT_FIGSIZE_IN,
+) -> None:
+    """Brittleness vs τ for DiffSBDD and Pocket2Mol on covered pockets."""
     out_pdf = Path(out_pdf)
     out_pdf.parent.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(figsize=(5.5, 3.8), facecolor="white")
+    setup_rc(True)
+    fig, ax = plt.subplots(figsize=figsize, facecolor="white")
     ax.set_facecolor("white")
+    kw = dict(linewidth=2.0, markersize=6.0, markeredgewidth=1.0)
     ax.plot(
-        table["threshold"],
-        table["brittleness_rate"],
+        table_diffsbdd["threshold"],
+        table_diffsbdd["brittleness_rate"],
         marker="o",
-        color="#1f77b4",
-        markeredgecolor="#d62728",
-        markeredgewidth=1.2,
-        linewidth=2.0,
-        markersize=7,
+        color=COLOR_DIFFSBDD,
+        markeredgecolor="#004466",
+        label=r"DiffSBDD (covered $N=47$)",
+        **kw,
     )
-    ax.set_xlabel(r"Threshold $\tau$ on metric SD (invariant conditions, unitless)")
+    ax.plot(
+        table_pocket2mol["threshold"],
+        table_pocket2mol["brittleness_rate"],
+        marker="s",
+        color=COLOR_POCKET2MOL,
+        markeredgecolor="#996000",
+        label=r"Pocket2Mol (covered $N=13$)",
+        **kw,
+    )
+    ax.set_xlabel(r"Threshold $\tau$ on metric SD (featurization conditions, unitless)")
     ax.set_ylabel("Brittleness rate (dimensionless)")
+    ax.set_xlim(xlim)
+    ax.set_xticks(list(xticks))
     ax.set_ylim(-0.02, 1.02)
     ax.grid(True, linestyle="--", alpha=0.35, color="#bbbbbb")
+    ax.legend(loc="best", framealpha=0.92)
+    ax.set_title("Brittleness vs dispersion threshold", fontweight="normal")
     fig.tight_layout()
-    fig.savefig(
-        out_pdf,
-        format="pdf",
-        bbox_inches="tight",
-        dpi=300,
-        facecolor="white",
-    )
+    save_figure(fig, out_pdf.parent / out_pdf.stem)
     plt.close(fig)
 
 
@@ -144,13 +196,19 @@ def main(argv: list[str] | None = None) -> None:
         "--metrics",
         type=Path,
         required=True,
-        help="metrics_per_condition__run*.csv or metrics_flagged__* (brittle cols ignored)",
+        help="DiffSBDD metrics_per_condition__run*.csv (brittle cols ignored if present)",
+    )
+    p.add_argument(
+        "--pocket2mol-metrics",
+        type=Path,
+        default=_ROOT / "data/results/metrics_per_condition__runpocket2mol_real47_full.csv",
+        help="Pocket2Mol metrics CSV; brittleness is computed on covered pockets only",
     )
     p.add_argument(
         "--summary",
         type=Path,
         default=None,
-        help="Optional robustness_summary__*.csv; cross-check n_brittle vs metrics path",
+        help="Optional robustness_summary__*.csv; cross-check n_brittle vs DiffSBDD metrics path",
     )
     p.add_argument(
         "--thresholds",
@@ -178,9 +236,25 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = p.parse_args(argv)
 
-    df = load_metrics_csv(args.metrics)
-    table = brittleness_vs_thresholds(
-        df,
+    diffsbdd_path = Path(args.metrics).resolve()
+    p2m_path = Path(args.pocket2mol_metrics).resolve()
+    if not diffsbdd_path.is_file():
+        raise FileNotFoundError(f"DiffSBDD metrics not found: {diffsbdd_path}")
+    if not p2m_path.is_file():
+        raise FileNotFoundError(f"Pocket2Mol metrics not found: {p2m_path}")
+
+    df_d = load_metrics_csv(diffsbdd_path)
+    df_p = load_metrics_csv(p2m_path)
+    good_p = _good_original_pocket_ids(df_p)
+    df_p_cov = _filter_pockets(df_p, good_p)
+
+    table_d = brittleness_vs_thresholds(
+        df_d,
+        thresholds=args.thresholds,
+        invariant_tags=args.invariant_tags,
+    )
+    table_p = brittleness_vs_thresholds(
+        df_p_cov,
         thresholds=args.thresholds,
         invariant_tags=args.invariant_tags,
     )
@@ -189,17 +263,23 @@ def main(argv: list[str] | None = None) -> None:
         summary_df = pd.read_csv(args.summary)
         validate_against_summary(
             summary_df,
-            table,
+            table_d,
             thresholds=args.thresholds,
             invariant_tags=args.invariant_tags,
         )
         print("OK: robustness_summary cross-check passed for all thresholds.")
 
+    merged = table_d.merge(
+        table_p,
+        on="threshold",
+        how="outer",
+        suffixes=("_diffsbdd", "_pocket2mol"),
+    ).sort_values("threshold")
     args.out_csv.parent.mkdir(parents=True, exist_ok=True)
-    table.to_csv(args.out_csv, index=False)
+    merged.to_csv(args.out_csv, index=False)
     print("Wrote", args.out_csv.resolve())
 
-    plot_curve(table, args.out_figure)
+    plot_curve(table_d, table_p, args.out_figure)
     print("Wrote", args.out_figure.resolve())
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Figure 3: Mean SA (original) vs mean SA averaged over invariant conditions — DiffSBDD."""
+"""Mean SA (original) vs mean SA averaged over featurization stress conditions — DiffSBDD."""
 
 from __future__ import annotations
 
@@ -54,25 +54,43 @@ def main() -> int:
             xs.append(float(sa_o))
             ys.append(float(sa_i))
 
+    n_up = sum(1 for x, y in zip(xs, ys) if y > x)
     lims = [min(xs + ys) * 0.97, max(xs + ys) * 1.03]
 
-    fig, ax = plt.subplots(figsize=(5.5, 5.5), facecolor="white")
+    import sys
+
+    _R = Path(__file__).resolve().parents[2]
+    sys.path.insert(0, str(_R / "paper" / "figures"))
+    from nmi_style import COLOR_DIFFSBDD, save_figure, setup_rc
+
+    setup_rc(True)
+    fig, ax = plt.subplots(figsize=(3.5, 3.5), facecolor="white")
     ax.set_facecolor("white")
-    ax.scatter(xs, ys, c="#1f77b4", edgecolors="white", linewidths=0.6, s=55, alpha=0.9)
-    ax.plot(lims, lims, color="#b0b0b0", linestyle="--", linewidth=1.2, label="Identity")
-    ax.set_xlabel("Mean SA, original pocket (RDKit SA score, unitless)")
-    ax.set_ylabel("Mean SA, average over 4 invariant conditions (unitless)")
-    ax.set_title("DiffSBDD: synthetic-accessibility drift under invariants (47 pockets)")
+    ax.scatter(xs, ys, c=COLOR_DIFFSBDD, edgecolors="white", linewidths=0.5, s=40, alpha=0.9)
+    ax.plot(lims, lims, color="#b0b0b0", linestyle="--", linewidth=1.2, label="Identity (no drift)")
+    ax.set_xlabel("Mean SA, original pocket (RDKit SA score)")
+    ax.set_ylabel("Mean SA, mean over four featurization conditions")
+    ntot = len(xs)
+    ax.set_title(
+        f"Mean synthetic accessibility drift (DiffSBDD, {ntot} pockets): "
+        f"{n_up}/{ntot} above identity",
+        fontweight="normal",
+        fontsize=8,
+    )
     ax.set_xlim(lims)
     ax.set_ylim(lims)
     ax.set_aspect("equal", adjustable="box")
-    ax.legend(loc="upper left", frameon=False)
+    ax.legend(loc="upper left", frameon=False, fontsize=7)
     ax.grid(True, linestyle="--", alpha=0.35, color="#cccccc")
     fig.tight_layout()
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(args.out, format="pdf", dpi=300, bbox_inches="tight", facecolor="white")
+    out_stem = args.out.with_suffix("")
+    save_figure(fig, out_stem)
     plt.close(fig)
-    print("Wrote", args.out.resolve(), f"({len(xs)} points)")
+    print(
+        "Wrote",
+        args.out.resolve(),
+        f"({len(xs)} points; {n_up}/{len(xs)} above identity / upward mean SA drift)",
+    )
     return 0
 
 
