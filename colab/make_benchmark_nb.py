@@ -165,10 +165,22 @@ def _restore_lightning_modules() -> None:
     if not _python_syntax_ok(LM):
         raise RuntimeError("Could not restore a valid lightning_modules.py")
 
-# --- generate_ligands.py: torch.load + --device ---
+# --- generate_ligands.py: torch.load + --device + Py3.12 pkgutil shim ---
 gl = DS / "generate_ligands.py"
 if gl.is_file():
     t = _read(gl)
+    if "_pkgutil_ImpImporter_shim" not in t:
+        py312_head = dedent('''
+            # sbdd_robust: Python 3.12 compat for pytorch-lightning 1.8 (_pkgutil_ImpImporter_shim)
+            import pkgutil as _pkgutil
+            if not hasattr(_pkgutil, "ImpImporter"):
+                class _ImpImporter:
+                    def find_module(self, fullname, path=None):
+                        return None
+                _pkgutil.ImpImporter = _ImpImporter
+
+        ''')
+        t = py312_head + t
     anchor = "\nfrom lightning_modules import LigandPocketDDPM\n"
     if anchor in t and "_torch_load_compat" not in t:
         shim = '''
@@ -883,6 +895,8 @@ def pip(parts: list[str]) -> None:
         )
 
 
+pip(["install", "-q", "--upgrade", "pip", "setuptools", "wheel"])
+
 pip(
     [
         "install",
@@ -902,9 +916,6 @@ pip([
     "-f",
     "https://data.pyg.org/whl/torch-2.1.0+cu118.html",
 ])
-
-# Modern setuptools wheels; avoids dependency chain trying legacy setup.py helpers.
-pip(["install", "-q", "--upgrade", "pip", "setuptools", "wheel"])
 
 pip(
     [
@@ -931,12 +942,23 @@ os.environ["WANDB_MODE"] = "offline"
 os.environ.setdefault("WANDB_SILENT", "true")
 print("WANDB_MODE =", os.environ["WANDB_MODE"])
 
+# Python 3.12 removed pkgutil.ImpImporter; PL 1.8 / old pkg_resources still need it.
+import pkgutil as _pkgutil
+if not hasattr(_pkgutil, "ImpImporter"):
+    class _ImpImporter:
+        def find_module(self, fullname, path=None):
+            return None
+    _pkgutil.ImpImporter = _ImpImporter
+
 import torch
 
 if not torch.cuda.is_available():
     raise RuntimeError("GPU vanished after reinstall — reinstall order / CUDA index mismatch.")
 
 print("torch OK", torch.__version__)
+
+import pytorch_lightning as _pl
+print("pytorch_lightning OK", _pl.__version__)
 """)
     )
 

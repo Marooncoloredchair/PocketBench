@@ -150,6 +150,14 @@ class DiffSBDDAdapter(BaseSBDDAdapter):
                 import json, runpy, sys
                 from pathlib import Path
 
+                # Python 3.12 removed pkgutil.ImpImporter; PL 1.8 / old pkg_resources need it.
+                import pkgutil as _pkgutil
+                if not hasattr(_pkgutil, "ImpImporter"):
+                    class _ImpImporter:
+                        def find_module(self, fullname, path=None):
+                            return None
+                    _pkgutil.ImpImporter = _ImpImporter
+
                 # PyTorch 2.6+ defaults torch.load(weights_only=True). DiffSBDD checkpoints
                 # (PyTorch Lightning 1.8) pickle argparse.Namespace and other objects; need full unpickle.
                 import torch as _torch
