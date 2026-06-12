@@ -230,14 +230,28 @@ def cmd_run(args: argparse.Namespace) -> int:
             except OSError:
                 pass
 
-    def _flush_csv() -> None:
+    def _flush_csv(best_effort: bool = False) -> None:
         if not rows:
             return
         # Atomic rewrite (temp + os.replace) so a disconnect mid-write can't corrupt
         # the checkpoint the next session resumes from.
-        tmp = metrics_csv.with_name(metrics_csv.name + ".tmp")
-        pd.DataFrame(rows).to_csv(tmp, index=False)
-        os.replace(tmp, metrics_csv)
+        try:
+            tmp = metrics_csv.with_name(metrics_csv.name + ".tmp")
+            pd.DataFrame(rows).to_csv(tmp, index=False)
+            os.replace(tmp, metrics_csv)
+        except OSError as e:
+            # Per-condition checkpoints can hit transient Google Drive FUSE write errors.
+            # Don't let that bubble into the pocket-level handler (which, with
+            # skip_failed=True, would discard an otherwise-good pocket). The row stays
+            # in memory and is re-checkpointed on the next condition / final flush.
+            if best_effort:
+                print(
+                    f"[sbdd_robust] WARN: checkpoint write failed ({e}); "
+                    "keeping rows in memory, will retry next flush.",
+                    file=sys.stderr,
+                )
+                return
+            raise
 
     for pc in pockets_cfg:
         pid = str(pc.id)
@@ -302,7 +316,8 @@ def cmd_run(args: argparse.Namespace) -> int:
                 }
                 rows.append(row)
                 done.add((pid, ptag))
-                _flush_csv()  # checkpoint after every condition so progress survives a disconnect
+                # checkpoint after every condition so progress survives a disconnect
+                _flush_csv(best_effort=True)
         except Exception as e:
             if not skip_failed:
                 raise

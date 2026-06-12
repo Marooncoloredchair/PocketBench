@@ -511,12 +511,14 @@ if rc != 0:
 
 # Guard against silent empty runs (all pockets skipped/failed).
 _sidecar2 = ROOT / ".pb_paths.json"
-_res = (
-    Path(json.loads(_sidecar2.read_text(encoding="utf-8"))["results"])
-    if _sidecar2.is_file()
-    else Path("/content/sbdd_robust_work/data/results")
-)
-_metrics = _res / "metrics_per_condition__runreal100.csv"
+if _sidecar2.is_file():
+    _info2 = json.loads(_sidecar2.read_text(encoding="utf-8"))
+    _res = Path(_info2["results"])
+    _run_id2 = _info2.get("run_id", "real100")
+else:
+    _res = Path("/content/sbdd_robust_work/data/results")
+    _run_id2 = "real100"
+_metrics = _res / f"metrics_per_condition__run{_run_id2}.csv"
 if not _metrics.is_file() or _metrics.stat().st_size == 0:
     raise RuntimeError(
         "Benchmark finished but metrics CSV is missing/empty at "
