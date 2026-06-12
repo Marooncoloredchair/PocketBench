@@ -118,6 +118,7 @@ CELL7 = dedent(r"""
 from __future__ import annotations
 
 from pathlib import Path
+from textwrap import dedent
 
 
 def _read(p: Path) -> str:
