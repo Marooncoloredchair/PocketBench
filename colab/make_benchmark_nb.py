@@ -852,7 +852,7 @@ print("DRIVE_OUT:", DRIVE_OUT.resolve())
 ### Cell 3 — Pip installs (**CUDA 11.8** stack)
 
 1. **`torch torchvision`** from pytorch cu118 wheels.
-2. **`pytorch-lightning==1.8.4`** + **`torch-scatter`** from **`data.pyg.org`** (`torch-2.1.0+cu118` wheels).
+2. **`pytorch-lightning==1.8.4`**, then **`torch-scatter`** from **`data.pyg.org`** using a wheel index matched to the **installed** `torch` + CUDA (Colab often ships PyTorch newer than 2.1; a fixed `torch-2.1.0+cu118` URL makes pip build from source and fail).
 3. Core chemistry/analysis wheels (**`rdkit`**, pinned **`openbabel-wheel`**, tables/plot libs, **`wandb>=0.16.6`**).  
    Older **`wandb==0.13.1`** (DiffSBDD conda parity) pulls unmaintained deps (**`pathtools`**, …) that often hit **`egg_info` / metadata-generation-failed** on Colab setuptools.
 
@@ -895,6 +895,55 @@ def pip(parts: list[str]) -> None:
         )
 
 
+def install_torch_scatter() -> None:
+    import torch
+
+    ver = torch.__version__.split("+")[0]
+    major, minor, *_ = (ver + ".0").split(".")[:2]
+    cuda = torch.version.cuda
+    cuda_tag = "cu" + cuda.replace(".", "") if cuda else "cpu"
+    minor_i = int(minor)
+
+    urls: list[str] = []
+    seen: set[str] = set()
+    for m in range(minor_i, max(0, minor_i - 4) - 1, -1):
+        u = f"https://data.pyg.org/whl/torch-{major}.{m}.0+{cuda_tag}.html"
+        if u not in seen:
+            seen.add(u)
+            urls.append(u)
+
+    last_tail = ""
+    for url in urls:
+        cmd = [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "-q",
+            "torch-scatter",
+            "-f",
+            url,
+            "--only-binary=:all:",
+        ]
+        print("$", " ".join(cmd))
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode == 0:
+            print("torch-scatter OK from", url)
+            return
+        last_tail = (proc.stderr or proc.stdout or "")[-12000:]
+
+    raise RuntimeError(
+        "torch-scatter: no PyG wheel for torch "
+        + torch.__version__
+        + " cuda="
+        + str(cuda)
+        + "; tried "
+        + ", ".join(urls)
+        + ". Tail: "
+        + (last_tail or "(empty)")
+    )
+
+
 pip(["install", "-q", "--upgrade", "pip", "setuptools", "wheel"])
 
 pip(
@@ -908,14 +957,9 @@ pip(
     ]
 )
 
-pip([
-    "install",
-    "-q",
-    "pytorch-lightning==1.8.4",
-    "torch-scatter",
-    "-f",
-    "https://data.pyg.org/whl/torch-2.1.0+cu118.html",
-])
+pip(["install", "-q", "pytorch-lightning==1.8.4"])
+
+install_torch_scatter()
 
 pip(
     [
@@ -959,6 +1003,9 @@ print("torch OK", torch.__version__)
 
 import pytorch_lightning as _pl
 print("pytorch_lightning OK", _pl.__version__)
+
+import torch_scatter as _ts
+print("torch_scatter OK", getattr(_ts, "__version__", "unknown"))
 """)
     )
 
