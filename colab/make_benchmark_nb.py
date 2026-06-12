@@ -83,17 +83,16 @@ def download_pdbs_from_real100_yaml(cfg_path: Path) -> None:
 
 RAW.mkdir(parents=True, exist_ok=True)
 
-if SCRIPT.is_file():
+if CFG_REAL100.is_file():
+    # Repo ships the frozen 100-pocket panel; use it verbatim (the committed PDBs
+    # already match) and only fetch any that are missing. Do NOT re-run the RCSB
+    # generator here — it could select a different panel than the committed PDBs.
+    print("Using committed configs/diffsbdd_real100.yaml (frozen panel); fetching any missing PDBs.")
+    download_pdbs_from_real100_yaml(CFG_REAL100)
+elif SCRIPT.is_file():
     print("$ python", SCRIPT)
     if subprocess.run([sys.executable, str(SCRIPT)], cwd=str(ROOT)).returncode != 0:
         raise RuntimeError("generator failed")
-elif CFG_REAL100.is_file():
-    print(
-        "WARN: Missing "
-        + str(SCRIPT)
-        + " -> using repo YAML only and fetching PDBs from files.rcsb.org",
-    )
-    download_pdbs_from_real100_yaml(CFG_REAL100)
 else:
     # Notebook embed (built by colab/make_benchmark_nb.py): clone may omit YAML on GitHub.
     _embedded = zlib.decompress(
@@ -362,6 +361,7 @@ print("Cell 7 done")
 CELL8 = dedent(r"""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 try:
@@ -377,11 +377,27 @@ if not src.is_file():
 with src.open(encoding="utf-8") as fh:
     cfg = yaml.safe_load(fh)
 
+# Checkpoint results+generations onto Google Drive when it is mounted (Cell 2) so a
+# Colab disconnect mid-run is recoverable; fall back to ephemeral /content otherwise.
+DRIVE_MYDRIVE = Path("/content/drive/MyDrive")
+if DRIVE_MYDRIVE.is_dir():
+    WORK = DRIVE_MYDRIVE / "sbdd-robust-results" / "real100" / "work"
+    on_drive = True
+else:
+    WORK = Path("/content/sbdd_robust_work/data")
+    on_drive = False
+RESULTS_DIR = WORK / "results"
+GENERATIONS_DIR = WORK / "generations"
+
 cfg.setdefault("paths", {})
 cfg["project_root"] = str(ROOT)
-cfg["paths"]["results"] = "/content/sbdd_robust_work/data/results"
-cfg["paths"]["generations"] = "/content/sbdd_robust_work/data/generations"
+cfg["paths"]["results"] = str(RESULTS_DIR)
+cfg["paths"]["generations"] = str(GENERATIONS_DIR)
 cfg["skip_failed_pockets"] = True
+# Stable run_id + resume: re-running Cell 9 after a disconnect skips finished
+# (pocket, perturbation) conditions instead of restarting from pocket 1.
+cfg["run_id"] = "real100"
+cfg["resume"] = True
 
 m = cfg.setdefault("model", {})
 m["repo_root"] = "/content/DiffSBDD"
@@ -390,22 +406,37 @@ m["python_exe"] = "/usr/bin/python3"
 m.setdefault("sanitize", False)
 m["extra_args"] = ["--device", "cuda"]
 
-for d in (
-    Path("/content/sbdd_robust_work/data/results"),
-    Path("/content/sbdd_robust_work/data/generations"),
-):
+for d in (RESULTS_DIR, GENERATIONS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 outp = ROOT / "configs" / "diffsbdd_real100_colab.yaml"
 with outp.open("w", encoding="utf-8") as fh:
     yaml.safe_dump(cfg, fh, sort_keys=False, width=140)
+
+# Sidecar so later cells (9/10/11) use the same paths regardless of run order.
+sidecar = ROOT / ".pb_paths.json"
+sidecar.write_text(
+    json.dumps(
+        {
+            "results": str(RESULTS_DIR),
+            "generations": str(GENERATIONS_DIR),
+            "run_id": "real100",
+            "on_drive": on_drive,
+        }
+    ),
+    encoding="utf-8",
+)
 print("wrote", outp)
+print("results dir:", RESULTS_DIR, "(persisted to Drive)" if on_drive else "(EPHEMERAL /content)")
+if not on_drive:
+    print("WARNING: Drive not mounted (run Cell 2) — results will be LOST on disconnect.")
 """)
 
 
 CELL9 = dedent(r"""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -416,6 +447,24 @@ cfgp = ROOT / "configs" / "diffsbdd_real100_colab.yaml"
 if not cfgp.is_file():
     raise RuntimeError("Run Cell 8 first.")
 
+# Report where results are checkpointed (and whether a prior run can be resumed).
+sidecar = ROOT / ".pb_paths.json"
+if sidecar.is_file():
+    info = json.loads(sidecar.read_text(encoding="utf-8"))
+    res_dir = Path(info["results"])
+    prior = res_dir / f"metrics_per_condition__run{info.get('run_id', 'real100')}.csv"
+    print("results dir:", res_dir, "(Drive)" if info.get("on_drive") else "(EPHEMERAL)")
+    if prior.is_file():
+        try:
+            import pandas as pd
+
+            ndone = len(pd.read_csv(prior))
+            print(f"RESUME: found {ndone} completed conditions — these will be skipped.")
+        except Exception:
+            print("RESUME: prior checkpoint present; completed conditions will be skipped.")
+    else:
+        print("Fresh run (no prior checkpoint).")
+
 os.environ["PYTHONUNBUFFERED"] = "1"
 os.environ["DIFFSBDD_PYTHON"] = "/usr/bin/python3"
 os.environ["DIFFSBDD_REPO"] = str(Path("/content/DiffSBDD"))
@@ -423,7 +472,7 @@ os.environ["DIFFSBDD_CHECKPOINT"] = (
     "/content/DiffSBDD/checkpoints/crossdocked_fullatom_cond.ckpt"
 )
 
-cmd = [sys.executable, "-u", "-m", "sbdd_robust", "run", "--config", str(cfgp)]
+cmd = [sys.executable, "-u", "-m", "sbdd_robust", "run", "--config", str(cfgp), "--resume"]
 print("$ cd", ROOT)
 print("$", " ".join(cmd))
 
@@ -453,10 +502,15 @@ print("[benchmark finished] OK")
 CELL10 = dedent(r"""
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
-SRC = Path("/content/sbdd_robust_work/data/results")
+_sidecar = Path("/content/sbdd-robust/.pb_paths.json")
+if _sidecar.is_file():
+    SRC = Path(json.loads(_sidecar.read_text(encoding="utf-8"))["results"])
+else:
+    SRC = Path("/content/sbdd_robust_work/data/results")
 if not SRC.is_dir():
     raise RuntimeError("Missing results directory — Cell 9 must succeed first.")
 
@@ -480,11 +534,23 @@ def mirror_tree(a: Path, b: Path) -> int:
     return n
 
 
-nfiles = mirror_tree(SRC, dst)
-csvs = list(dst.glob("metrics_per_condition__*.csv"))
-print(f"Copied {nfiles} files into {dst.resolve()}")
+# Cell 8 checkpoints directly to Drive when it is mounted, so results may already
+# live under dst — in that case just verify rather than copy onto itself.
+src_res = SRC.resolve()
+dst_res = dst.resolve()
+already_on_drive = src_res == dst_res or str(src_res).startswith(str(dst_res) + "/")
+
+if already_on_drive:
+    print(f"Results already on Drive at {src_res} — no copy needed.")
+    look_in = SRC
+else:
+    nfiles = mirror_tree(SRC, dst)
+    print(f"Copied {nfiles} files into {dst_res}")
+    look_in = dst
+
+csvs = list(look_in.glob("metrics_per_condition__*.csv"))
 if not csvs:
-    raise RuntimeError("metrics_per_condition CSV not found after copy")
+    raise RuntimeError("metrics_per_condition CSV not found")
 print("Example metrics CSV:", csvs[0].name)
 """)
 
@@ -498,7 +564,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-RES = Path("/content/sbdd_robust_work/data/results")
+_sidecar = Path("/content/sbdd-robust/.pb_paths.json")
+if _sidecar.is_file():
+    RES = Path(json.loads(_sidecar.read_text(encoding="utf-8"))["results"])
+else:
+    RES = Path("/content/sbdd_robust_work/data/results")
 csvs = sorted(RES.glob("metrics_per_condition__*.csv"))
 if not csvs:
     raise RuntimeError("No metrics_per_condition CSV")
@@ -1081,14 +1151,16 @@ print("checkpoint bytes", dst.stat().st_size)
                 (
                     "### Cell 6 - **Real-100 PDBs + `diffsbdd_real100.yaml`**",
                     "",
-                    "1. Preferred: **`scripts/generate_real100_config.py`** (heavy RCSB Search API filtering).",
+                    "1. Preferred: use the **committed `configs/diffsbdd_real100.yaml`** (the frozen panel) and "
+                    "**fetch only missing PDBs** from **`files.rcsb.org`**. The generator is *not* re‑run here, "
+                    "so the panel always matches the committed PDBs.",
                     "",
-                    "2. If generator missing but repo has **`configs/diffsbdd_real100.yaml`**, Cell 6 only "
-                    "**downloads PDBs** listed there from **`files.rcsb.org`**.",
+                    "2. If the YAML is absent (partial clone) but **`scripts/generate_real100_config.py`** exists, "
+                    "Cell 6 runs the generator (heavy RCSB Search API filtering).",
                     "",
-                    "3. If YAML is also missing from the cloned branch, Cell 6 restores **`configs/diffsbdd_real100.yaml`** "
+                    "3. If both are missing, Cell 6 restores **`configs/diffsbdd_real100.yaml`** "
                     "from a zlib/base64 blob embedded when **`colab/make_benchmark_nb.py`** was executed, "
-                    "then PDB downloads plus count check **`>= 100` PDBs**. Prefer git push for canonical YAML.",
+                    "then PDB downloads plus count check **`>= 100` PDBs**.",
                 )
             )
         )
@@ -1108,23 +1180,29 @@ print("checkpoint bytes", dst.stat().st_size)
         md(
             "### Cell 8 — `diffsbdd_real100_colab.yaml`\n\n"
             "Writes **`/content/sbdd-robust/configs/diffsbdd_real100_colab.yaml`** with Colab literals, "
-            "**`paths.results`** / **`paths.generations`**, **`skip_failed_pockets: true`**, "
-            "and **`extra_args: [--device, cuda]`**."
+            "**`skip_failed_pockets: true`**, **`extra_args: [--device, cuda]`**, and a stable "
+            "**`run_id: real100`** + **`resume: true`**. When **Drive is mounted (Cell 2)**, "
+            "**`paths.results`** / **`paths.generations`** point at "
+            "**`MyDrive/sbdd-robust-results/real100/work`** so every finished pocket is checkpointed "
+            "to Drive — a disconnect mid‑run is recoverable by just re‑running Cell 9."
         )
     )
     c.append(py(CELL8.strip("\n")))
     c.append(
         md(
-            "### Cell 9 — Benchmark (**streamed**)\n\n"
-            "Exports **`DIFFSBDD_*`** + **`PYTHONUNBUFFERED`**, **`Popen` line streaming** "
-            "(**merged stderr**) — many hours runtime."
+            "### Cell 9 — Benchmark (**streamed, resumable**)\n\n"
+            "Exports **`DIFFSBDD_*`** + **`PYTHONUNBUFFERED`**, runs with **`--resume`**, "
+            "**`Popen` line streaming** (**merged stderr**). 100 pockets × 5 perturbations is "
+            "**many hours** — if Colab disconnects, just **re‑run this cell**; completed "
+            "(pocket, perturbation) conditions in the Drive checkpoint CSV are **skipped**."
         )
     )
     c.append(py(CELL9.strip("\n")))
     c.append(
         md(
             "### Cell 10 — Snapshot to Drive\n\n"
-            "Clears then mirrors **`/content/sbdd_robust_work/data/results`** into **`DRIVE_OUT`**."
+            "Reads the results dir from the Cell 8 sidecar. If results already live on Drive "
+            "(checkpointed during the run), it just verifies; otherwise it mirrors into **`DRIVE_OUT`**."
         )
     )
     c.append(py(CELL10.strip("\n")))

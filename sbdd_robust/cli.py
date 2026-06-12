@@ -185,11 +185,15 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     results_dir = _resolve(root, cfg.paths.results)
     results_dir.mkdir(parents=True, exist_ok=True)
-    run_id = str(cfg.get("run_id") or int(time.time()))
+    # A stable run_id is required for resume to match a prior partial run; a bare
+    # timestamp default would never line up across sessions (e.g. Colab disconnects).
+    run_id = str(getattr(args, "run_id", None) or cfg.get("run_id") or int(time.time()))
+    resume = bool(getattr(args, "resume", False) or cfg.get("resume", False))
     metrics_csv = results_dir / f"metrics_per_condition__run{run_id}.csv"
 
     pockets_cfg: List[Any] = list(cfg.pockets)
     pert_specs = [OmegaConf.to_container(p, resolve=True) for p in cfg.perturbations]
+    pert_tags = [str(s.get("tag", s.get("type", "unknown"))) for s in pert_specs]
     invariant_tags = list(cfg.get("invariant_tags", ["atom_shuffle", "coordinate_jitter"]))
     threshold = float(cfg.get("brittleness_std_threshold", 0.1))
     radius = float(cfg.get("extraction_radius", 8.0))
@@ -197,9 +201,42 @@ def cmd_run(args: argparse.Namespace) -> int:
     skip_failed = bool(cfg.get("skip_failed_pockets", False))
 
     rows: list[dict[str, Any]] = []
+    done: set[tuple[str, str]] = set()
+    if resume and metrics_csv.is_file():
+        try:
+            prev = pd.read_csv(metrics_csv)
+            rows = prev.to_dict("records")
+            done = {
+                (str(r.get("pocket_id")), str(r.get("perturbation_tag")))
+                for r in rows
+            }
+            print(
+                f"[sbdd_robust] resume: loaded {len(rows)} rows / {len(done)} completed "
+                f"conditions from {metrics_csv}",
+                file=sys.stderr,
+            )
+        except Exception as e:  # corrupt/partial CSV: start clean rather than crash
+            print(
+                f"[sbdd_robust] resume: could not read {metrics_csv} ({e}); starting fresh",
+                file=sys.stderr,
+            )
+            rows, done = [], set()
+
+    def _flush_csv() -> None:
+        # Atomic rewrite (temp + os.replace) so a disconnect mid-write can't corrupt
+        # the checkpoint the next session resumes from.
+        tmp = metrics_csv.with_name(metrics_csv.name + ".tmp")
+        pd.DataFrame(rows).to_csv(tmp, index=False)
+        os.replace(tmp, metrics_csv)
 
     for pc in pockets_cfg:
         pid = str(pc.id)
+        if resume and pert_tags and all((pid, t) in done for t in pert_tags):
+            print(
+                f"[sbdd_robust] resume: skip pocket {pid} (all {len(pert_tags)} conditions done)",
+                file=sys.stderr,
+            )
+            continue
         try:
             pdb = _resolve(root, pc.pdb)
             sdf = pc.get("sdf")
@@ -221,7 +258,14 @@ def cmd_run(args: argparse.Namespace) -> int:
             gen_root = _resolve(root, cfg.paths.generations) / f"run_{run_id}"
             compute_dock = bool(cfg.get("compute_docking", False))
             for pock in pert_pockets:
-                wdir = gen_root / pid / str(pock.metadata.get("perturbation_tag", "unknown"))
+                ptag = str(pock.metadata.get("perturbation_tag", "unknown"))
+                if resume and (pid, ptag) in done:
+                    print(
+                        f"[sbdd_robust] resume: skip {pid}/{ptag} (already done)",
+                        file=sys.stderr,
+                    )
+                    continue
+                wdir = gen_root / pid / ptag
                 wdir.mkdir(parents=True, exist_ok=True)
                 mols = adapter.generate(pock, n_samples=n_samples, workdir=wdir)
                 summary = chem_mod.summarize_molecules(mols)
@@ -241,19 +285,22 @@ def cmd_run(args: argparse.Namespace) -> int:
                 row = {
                     "pocket_id": pid,
                     "perturbation_type": pock.metadata.get("perturbation_type", ""),
-                    "perturbation_tag": pock.metadata.get("perturbation_tag", ""),
+                    "perturbation_tag": ptag,
                     "model_name": adapter.name,
                     "run_id": run_id,
                     **summary,
                 }
                 rows.append(row)
+                done.add((pid, ptag))
+                _flush_csv()  # checkpoint after every condition so progress survives a disconnect
         except Exception as e:
             if not skip_failed:
                 raise
             print(f"[sbdd_robust] SKIP pocket {pid}: {e}", file=sys.stderr)
 
-    df = pd.DataFrame(rows)
-    df.to_csv(metrics_csv, index=False)
+    _flush_csv()
+    # Re-read for consistent dtypes (resumed rows came back as strings/NaN from CSV).
+    df = pd.read_csv(metrics_csv) if metrics_csv.is_file() and rows else pd.DataFrame(rows)
 
     flagged = rob_mod.flag_invariant_brittleness(
         df,
@@ -335,6 +382,18 @@ def main(argv: List[str] | None = None) -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     run_p = sub.add_parser("run", help="Run benchmark pipeline from YAML config")
     run_p.add_argument("--config", type=str, required=True)
+    run_p.add_argument(
+        "--run-id",
+        dest="run_id",
+        type=str,
+        default=None,
+        help="Stable run id (overrides config). Required for resume to match across sessions.",
+    )
+    run_p.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip (pocket, perturbation) conditions already present in the run's metrics CSV.",
+    )
     run_p.set_defaults(func=cmd_run)
 
     args = parser.parse_args(argv)
