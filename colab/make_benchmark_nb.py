@@ -117,6 +117,10 @@ if n_pdb < 100:
 CELL7 = dedent(r"""
 from __future__ import annotations
 
+import ast
+import subprocess
+import sys
+import urllib.request
 from pathlib import Path
 from textwrap import dedent
 
@@ -129,7 +133,37 @@ def _write(p: Path, text: str) -> None:
     p.write_text(text, encoding="utf-8")
 
 
+def _python_syntax_ok(path: Path) -> bool:
+    try:
+        ast.parse(_read(path))
+        return True
+    except SyntaxError:
+        return False
+
+
 DS = Path("/content/DiffSBDD")
+LM = DS / "lightning_modules.py"
+LM_UPSTREAM = (
+    "https://raw.githubusercontent.com/arneschneuing/DiffSBDD/main/lightning_modules.py"
+)
+
+
+def _restore_lightning_modules() -> None:
+    if not LM.is_file():
+        return
+    proc = subprocess.run(
+        ["git", "checkout", "--", "lightning_modules.py"],
+        cwd=str(DS),
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0 and _python_syntax_ok(LM):
+        print("Restored lightning_modules.py from git")
+        return
+    print("WARN: git restore failed or still invalid — fetching upstream raw file")
+    urllib.request.urlretrieve(LM_UPSTREAM, LM)
+    if not _python_syntax_ok(LM):
+        raise RuntimeError("Could not restore a valid lightning_modules.py")
 
 # --- generate_ligands.py: torch.load + --device ---
 gl = DS / "generate_ligands.py"
@@ -188,7 +222,10 @@ torch.load = _torch_load_compat
     _write(gl, t)
     print("generate_ligands.py patched OK")
 
-LM = DS / "lightning_modules.py"
+if LM.is_file() and not _python_syntax_ok(LM):
+    print("WARN: lightning_modules.py syntax error (likely old Cell 7 bug) — restoring")
+    _restore_lightning_modules()
+
 if LM.is_file():
     txt = _read(LM)
     lm_old = (
@@ -217,65 +254,22 @@ except ImportError:
 ''')
     if lm_old in txt:
         txt = txt.replace(lm_old, lm_new, 1)
+        _write(LM, txt)
 
-    if "_diffsbdd_chain" not in txt:
-        anchor = "from analysis.docking import smina_score\n\n\nclass LigandPocketDDPM"
-        old_b = (
-            "        if pocket_ids is not None:\n"
-            "            # define pocket with list of residues\n"
-            "            residues = [\n"
-            "                pdb_struct[x.split(':')[0]][(' ', int(x.split(':')[1]), ' ')]\n"
-            "                for x in pocket_ids]\n\n"
-            "        else:"
-        )
-        new_b = (
-            "        if pocket_ids is not None:\n"
-            "            residues = []\n"
-            "            for x in pocket_ids:\n"
-            "                parts = str(x).split(':', 1)\n"
-            "                if len(parts) != 2:\n"
-            "                    raise ValueError(\n"
-            '                        f"Bad pocket id {x!r}; expected chain:resseq")\n'
-            "                chain = _diffsbdd_chain(pdb_struct, parts[0])\n"
-            "                residues.append(_diffsbdd_residue(chain, int(parts[1])))\n\n"
-            "        else:"
-        )
-        inserted = dedent('''
-from analysis.docking import smina_score
+_sbdd_root = Path("/content/sbdd-robust")
+if str(_sbdd_root) not in sys.path:
+    sys.path.insert(0, str(_sbdd_root))
 
+from sbdd_robust.models.diffsbdd_lightning_patch import (  # noqa: E402
+    ensure_lightning_resi_patch,
+    reset_lightning_patch_cache,
+)
 
-def _diffsbdd_chain(pdb_model, chain_key: str):
-    ck = (chain_key or '').strip()
-    if ck in pdb_model:
-        return pdb_model[ck]
-    for cid in pdb_model:
-        if str(cid).strip() == ck:
-            return pdb_model[cid]
-    raise KeyError(f"chain {chain_key!r} not in structure")
-
-
-def _diffsbdd_residue(chain, resseq: int):
-    rid0 = (" ", int(resseq), " ")
-    if rid0 in chain:
-        return chain[rid0]
-    hits = [rid for rid in chain.child_dict if rid[1] == int(resseq)]
-    if not hits:
-        raise KeyError(f"resseq {resseq} not in chain {chain.id!r}")
-    if len(hits) == 1:
-        return chain[hits[0]]
-    hits.sort(key=lambda r: (str(r[0]), str(r[2])))
-    return chain[hits[0]]
-
-
-class LigandPocketDDPM
-''')
-        if anchor in txt and old_b in txt:
-            txt = txt.replace(anchor, inserted, 1).replace(old_b, new_b, 1)
-            print("Inserted pocket residue helpers")
-        else:
-            print("WARN: residue block not matched upstream")
-
-    _write(LM, txt)
+reset_lightning_patch_cache()
+ensure_lightning_resi_patch(DS)
+if not _python_syntax_ok(LM):
+    raise RuntimeError("lightning_modules.py still invalid after resi patch")
+print("lightning_modules.py patched OK")
 
 pc_old_tpl = (
     "from Bio.PDB import PDBParser\n"

@@ -59,6 +59,11 @@ _MARK = "def _diffsbdd_chain"
 _patched_roots: set[str] = set()
 
 
+def reset_lightning_patch_cache() -> None:
+    """Clear memoization (e.g. after restoring upstream ``lightning_modules.py``)."""
+    _patched_roots.clear()
+
+
 def ensure_lightning_resi_patch(repo_root: Path) -> None:
     """Idempotent: fix ``--resi_list`` / pocket_ids handling in DiffSBDD."""
     root = Path(repo_root).resolve()
