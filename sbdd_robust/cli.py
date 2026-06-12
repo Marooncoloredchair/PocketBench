@@ -46,8 +46,22 @@ from sbdd_robust.models.diffsbdd_adapter import DiffSBDDAdapter
 from sbdd_robust.models.mock_adapter import MockSBDDAdapter
 from sbdd_robust.models.pocket2mol_adapter import Pocket2MolAdapter
 from sbdd_robust.models.targetdiff_adapter import TargetDiffAdapter
-from sbdd_robust.perturbations.invariant import atom_shuffle, coordinate_jitter, crop_radius
+from sbdd_robust.perturbations.invariant import (
+    anchor_offset as anchor_offset_mod,
+    atom_shuffle,
+    coordinate_jitter,
+    crop_radius,
+    directional_crop,
+)
 from sbdd_robust.perturbations.meaningful import residue_mutation as residue_mut
+
+
+# Normalized chemistry metrics live on a comparable [0,1] scale, so a single std
+# threshold is meaningful for all of them. Raw counts (n_total/n_valid/...) and
+# unnormalized SA (mean_sa/std_sa) trivially exceed a [0,1]-tuned threshold and
+# dominated the historical "brittleness rate 1.0" headline; the normalized view
+# isolates instability in the chemistry the model is actually asked to optimize.
+NORMALIZED_METRICS: List[str] = ["validity", "uniqueness", "mean_qed", "std_qed"]
 
 
 def _resolve(root: Path, p: str | Path) -> Path:
@@ -156,6 +170,32 @@ def _apply_perturbations(
             p.metadata["perturbation_tag"] = tag
             out.append(p)
             continue
+        if typ == "face_peel" or typ == "directional_crop":
+            ax = spec.get("axis", "pca")
+            ax = ax if isinstance(ax, str) else list(ax)
+            p = directional_crop.face_peel(
+                base,
+                fraction=float(spec.get("fraction", 0.25)),
+                axis=ax,
+                direction=str(spec.get("direction", "plus")),
+                tag=tag,
+            )
+            p.metadata["perturbation_tag"] = tag
+            out.append(p)
+            continue
+        if typ == "anchor_offset":
+            ax = spec.get("direction", "pca")
+            ax = ax if isinstance(ax, str) else list(ax)
+            p = anchor_offset_mod.anchor_offset(
+                base,
+                offset_angstrom=float(spec.get("offset_angstrom", spec.get("offset", 2.0))),
+                direction=ax,
+                bbox_scale=float(spec.get("bbox_scale", 1.0)),
+                tag=tag,
+            )
+            p.metadata["perturbation_tag"] = tag
+            out.append(p)
+            continue
         if typ == "residue_mutation":
             if spec.get("residue_id_from_pocket"):
                 rid = str(pc.get("mutation_residue_id", "")).strip()
@@ -189,6 +229,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     # timestamp default would never line up across sessions (e.g. Colab disconnects).
     run_id = str(getattr(args, "run_id", None) or cfg.get("run_id") or int(time.time()))
     resume = bool(getattr(args, "resume", False) or cfg.get("resume", False))
+    normalized_only = bool(getattr(args, "normalized_only", False) or cfg.get("normalized_only", False))
+    normalized_metrics = list(cfg.get("normalized_metrics", NORMALIZED_METRICS))
     metrics_csv = results_dir / f"metrics_per_condition__run{run_id}.csv"
 
     pockets_cfg: List[Any] = list(cfg.pockets)
@@ -345,6 +387,24 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     br_stats = br_rate_mod.brittleness_rate_from_flagged(flagged)
 
+    # Normalized brittleness view: same threshold restricted to comparable [0,1]
+    # chemistry metrics. Emitted alongside the raw all-column flag so reports can
+    # separate true chemistry instability from raw-count/SA-scale artefacts.
+    flagged_norm_path = None
+    br_stats_norm = None
+    if normalized_only:
+        present_norm = [m for m in normalized_metrics if m in df.columns]
+        flagged_norm = rob_mod.flag_invariant_brittleness(
+            df,
+            invariant_tags=invariant_tags,
+            original_tag="original",
+            metric_std_threshold=threshold,
+            metrics_subset=present_norm,
+        )
+        flagged_norm_path = results_dir / f"metrics_flagged_normalized__run{run_id}.csv"
+        flagged_norm.to_csv(flagged_norm_path, index=False)
+        br_stats_norm = br_rate_mod.brittleness_rate_from_flagged(flagged_norm)
+
     summary = rob_mod.summarize_robustness_vs_original(
         df,
         invariant_tags=invariant_tags,
@@ -393,6 +453,15 @@ def cmd_run(args: argparse.Namespace) -> int:
             targetdiff_repo=targetdiff_repo,
         ),
     }
+    if br_stats_norm is not None:
+        meta["normalized_only"] = True
+        meta["normalized_metrics"] = [m for m in normalized_metrics if m in df.columns]
+        meta["flagged_normalized_csv"] = str(flagged_norm_path)
+        meta["brittleness_rate_normalized"] = br_stats_norm["brittleness_rate"]
+        meta["brittleness_counts_normalized"] = {
+            "brittle_pocket_model_pairs": br_stats_norm["brittle_pairs"],
+            "total_pocket_model_pairs": br_stats_norm["total_pairs"],
+        }
     (results_dir / f"run_meta__{run_id}.json").write_text(json.dumps(meta, indent=2))
 
     print(f"Wrote {metrics_csv}")
@@ -400,8 +469,16 @@ def cmd_run(args: argparse.Namespace) -> int:
     print(f"Wrote {summary_path}")
     print(
         f"brittleness_rate={br_stats['brittleness_rate']:.4f} "
-        f"({br_stats['brittle_pairs']}/{br_stats['total_pairs']} pocket–model pairs brittle on invariants)"
+        f"({br_stats['brittle_pairs']}/{br_stats['total_pairs']} pocket–model pairs brittle "
+        "on invariants, ALL metric columns)"
     )
+    if br_stats_norm is not None:
+        print(f"Wrote {flagged_norm_path}")
+        print(
+            f"brittleness_rate_normalized={br_stats_norm['brittleness_rate']:.4f} "
+            f"({br_stats_norm['brittle_pairs']}/{br_stats_norm['total_pairs']} pairs brittle on "
+            f"normalized metrics only: {', '.join(meta['normalized_metrics'])})"
+        )
     if figure_paths:
         print("Figures:")
         for fp in figure_paths:
@@ -409,8 +486,152 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_metrics_csv(path: str, model: str | None) -> "pd.DataFrame":
+    from sbdd_robust import report as report_mod
+
+    df = pd.read_csv(path)
+    if "pocket_id" not in df.columns:
+        raise ValueError(
+            f"{path} is missing required column 'pocket_id'. Expected a per-condition metrics "
+            "CSV (pocket_id, perturbation_tag, validity, uniqueness, mean_qed, std_qed, ...)."
+        )
+    return report_mod.filter_model(df, model)
+
+
+def cmd_pbsi(args: argparse.Namespace) -> int:
+    from sbdd_robust import report as report_mod
+
+    df = _load_metrics_csv(args.metrics, args.model)
+    name = args.dataset or Path(args.metrics).stem
+    pp, summary = report_mod.pocket_boundary_sensitivity(df, dataset=name)
+    if pp.empty:
+        raise SystemExit(
+            "No crop-radius conditions found. Need 'original' plus crop_radius_plus_/minus_ rows."
+        )
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pp.to_csv(out_dir / "pocket_boundary_sensitivity.csv", index=False)
+    pd.DataFrame([summary]).to_csv(out_dir / "pocket_boundary_sensitivity_summary.csv", index=False)
+    print(f"Pocket Boundary Sensitivity Index (PBSI) -- {name}")
+    print(f"  PBSI (median |dQED per A|)      : {summary['PBSI_median_abs_slope_qed_per_A']}")
+    print(f"  shrinking lowers QED in         : {summary['frac_shrinking_lowers_qed']:.0%} of pockets")
+    print(f"  median boundary/noise SNR (1.5A): {summary['median_snr_1.5A']}x")
+    print(f"  boundary swing > noise floor in : {summary['frac_boundary_exceeds_noise']:.0%} of pockets")
+    print(f"  wrote {out_dir / 'pocket_boundary_sensitivity.csv'}")
+    return 0
+
+
+def cmd_crop_test(args: argparse.Namespace) -> int:
+    from sbdd_robust import report as report_mod
+
+    df = _load_metrics_csv(args.metrics, args.model)
+    name = args.dataset or Path(args.metrics).stem
+    crop_tag = report_mod.resolve_crop_tag(df, args.crop_tag)
+    if crop_tag is None:
+        raise SystemExit(f"No crop_radius_minus_* conditions found in {args.metrics}.")
+    if crop_tag != args.crop_tag:
+        print(f"[note] '{args.crop_tag}' absent; using '{crop_tag}'.")
+    res = report_mod.crop_paired_wilcoxon(df, crop_tag=crop_tag, dataset=name)
+    if res.empty:
+        raise SystemExit(f"No paired rows for '{crop_tag}' vs 'original' in {args.metrics}.")
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    res.to_csv(args.out, index=False)
+    pd.set_option("display.width", 200)
+    pd.set_option("display.max_columns", 50)
+    print(res.to_string(index=False))
+    print(f"\nWrote {args.out}")
+    return 0
+
+
+def cmd_brittleness(args: argparse.Namespace) -> int:
+    from sbdd_robust import report as report_mod
+
+    df = _load_metrics_csv(args.metrics, args.model)
+    name = args.dataset or Path(args.metrics).stem
+    norm = report_mod.normalized_brittleness(df, taus=args.taus, dataset=name)
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    norm.to_csv(args.out, index=False)
+    print("Normalized brittleness (validity, uniqueness, mean_qed, std_qed):")
+    print(norm.to_string(index=False))
+    if args.raw:
+        all_metrics = [c for c in df.columns if c not in (
+            "pocket_id", "perturbation_type", "perturbation_tag", "model_name", "run_id",
+            "brittle_invariant", "brittleness_note") and pd.api.types.is_numeric_dtype(df[c])]
+        raw = report_mod.normalized_brittleness(df, taus=args.taus, metrics=all_metrics, dataset=name)
+        print("\nRaw all-column brittleness (cautionary; raw counts/SA inflate the flag):")
+        print(raw.to_string(index=False))
+    print(f"\nWrote {args.out}")
+    return 0
+
+
+def cmd_isr(args: argparse.Namespace) -> int:
+    from sbdd_robust import report as report_mod
+
+    df = _load_metrics_csv(args.metrics, args.model)
+    name = args.dataset or Path(args.metrics).stem
+    row = report_mod.initialization_sensitivity(
+        df, metric=args.metric, dataset=name, model=args.model
+    )
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([row]).to_csv(args.out, index=False)
+    print(f"Initialization Sensitivity Ratio (ISR) -- {name} [{row['model']}]")
+    print(f"  metric                      : {row['metric']}")
+    print(f"  frame median |delta|        : {row['frame_median_abs_delta']} "
+          f"(n={row['n_frame_pairs']}; tags: {row['frame_tags'] or '(none)'})")
+    print(f"  featurization median |delta|: {row['featurization_median_abs_delta']} "
+          f"(n={row['n_featurization_pairs']}; tags: {row['featurization_tags'] or '(none)'})")
+    print(f"  ISR                         : {row['ISR']} "
+          f"[95% CI {row['ISR_ci95_lo']}, {row['ISR_ci95_hi']}]")
+    print("  (ISR >> 1: frame-sensitive like autoregressive Pocket2Mol; ~1: diffusion-like)")
+    print(f"\nWrote {args.out}")
+    return 0
+
+
+def cmd_report(args: argparse.Namespace) -> int:
+    from sbdd_robust import report as report_mod
+
+    df = _load_metrics_csv(args.metrics, args.model)
+    name = args.dataset or Path(args.metrics).stem
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    norm = report_mod.normalized_brittleness(df, dataset=name)
+    norm.to_csv(out_dir / "normalized_brittleness.csv", index=False)
+    crop_tag = report_mod.resolve_crop_tag(df, args.crop_tag) or args.crop_tag
+    crop = report_mod.crop_paired_wilcoxon(df, crop_tag=crop_tag, dataset=name)
+    crop.to_csv(out_dir / "crop_radius_wilcoxon.csv", index=False)
+    pp, summary = report_mod.pocket_boundary_sensitivity(df, dataset=name)
+    pp.to_csv(out_dir / "pocket_boundary_sensitivity.csv", index=False)
+    pd.DataFrame([summary]).to_csv(out_dir / "pocket_boundary_sensitivity_summary.csv", index=False)
+    isr = report_mod.initialization_sensitivity(df, dataset=name, model=args.model)
+    pd.DataFrame([isr]).to_csv(out_dir / "initialization_sensitivity.csv", index=False)
+
+    lines: list[str] = [f"# PocketBench reliability report -- {name}", ""]
+    b10 = norm[abs(norm["tau"] - 0.10) < 1e-9]
+    if not b10.empty:
+        r = b10.iloc[0]
+        lines += [f"- **Normalized brittleness @ tau=0.10:** {r['brittleness_rate']:.3f} "
+                  f"({int(r['n_brittle'])}/{int(r['total'])} pockets)"]
+    if not crop.empty:
+        for _, r in crop.iterrows():
+            sig = "significant" if r["p_value"] < 0.05 else "n.s."
+            lines += [f"- **Crop {r['metric']} ({r['comparison']}):** median delta={r['median_delta']:+.3f}, "
+                      f"p={r['p_value']:.2e} ({sig}), rank-biserial r={r['rank_biserial_r']:+.3f}, n={int(r['n_pairs'])}"]
+    if summary.get("n_pockets"):
+        lines += [f"- **PBSI:** {summary['PBSI_median_abs_slope_qed_per_A']} QED/A (median |slope|); "
+                  f"boundary swing exceeds featurization noise in {summary.get('frac_boundary_exceeds_noise', float('nan')):.0%} of pockets"]
+    if not (isinstance(isr["ISR"], float) and pd.isna(isr["ISR"])):
+        lines += [f"- **ISR:** {isr['ISR']} [95% CI {isr['ISR_ci95_lo']}, {isr['ISR_ci95_hi']}] "
+                  f"(frame |delta| {isr['frame_median_abs_delta']} vs featurization "
+                  f"{isr['featurization_median_abs_delta']}; >>1 = autoregressive first-atom signature)"]
+    (out_dir / "REPORT.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("\n".join(lines))
+    print(f"\nWrote report + CSVs to {out_dir}")
+    return 0
+
+
 def main(argv: List[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(prog="sbdd-robust")
+    parser = argparse.ArgumentParser(prog="pocketbench")
     sub = parser.add_subparsers(dest="command", required=True)
     run_p = sub.add_parser("run", help="Run benchmark pipeline from YAML config")
     run_p.add_argument("--config", type=str, required=True)
@@ -426,7 +647,73 @@ def main(argv: List[str] | None = None) -> None:
         action="store_true",
         help="Skip (pocket, perturbation) conditions already present in the run's metrics CSV.",
     )
+    run_p.add_argument(
+        "--normalized-only",
+        dest="normalized_only",
+        action="store_true",
+        help=(
+            "Additionally emit a brittleness flag computed on normalized chemistry metrics only "
+            "(validity, uniqueness, mean_qed, std_qed), written alongside the raw all-column flag. "
+            "Separates true chemistry instability from raw-count / SA-scale artefacts."
+        ),
+    )
     run_p.set_defaults(func=cmd_run)
+
+    # ---- Analysis subcommands (operate on a per-condition metrics CSV; no GPU) ----
+    pbsi_p = sub.add_parser(
+        "pbsi",
+        help="Pocket Boundary Sensitivity Index from a metrics CSV (QED-vs-crop-radius slope).",
+    )
+    pbsi_p.add_argument("--metrics", required=True, help="Per-condition metrics CSV.")
+    pbsi_p.add_argument("--model", default=None, help="Filter to this model_name (optional).")
+    pbsi_p.add_argument("--dataset", default=None, help="Label for output rows (default: CSV stem).")
+    pbsi_p.add_argument("--out-dir", default="pocketbench_out", help="Output directory.")
+    pbsi_p.set_defaults(func=cmd_pbsi)
+
+    crop_p = sub.add_parser(
+        "crop-test",
+        help="Paired Wilcoxon test of a crop-radius condition vs original (ΔQED, ΔSA).",
+    )
+    crop_p.add_argument("--metrics", required=True, help="Per-condition metrics CSV.")
+    crop_p.add_argument("--model", default=None, help="Filter to this model_name (optional).")
+    crop_p.add_argument("--crop-tag", default="crop_radius_minus_1.5", help="Crop condition tag.")
+    crop_p.add_argument("--dataset", default=None, help="Label for output rows (default: CSV stem).")
+    crop_p.add_argument("--out", default="pocketbench_out/crop_radius_wilcoxon.csv", help="Output CSV.")
+    crop_p.set_defaults(func=cmd_crop_test)
+
+    brit_p = sub.add_parser(
+        "brittleness",
+        help="Normalized brittleness rate vs threshold from a metrics CSV.",
+    )
+    brit_p.add_argument("--metrics", required=True, help="Per-condition metrics CSV.")
+    brit_p.add_argument("--model", default=None, help="Filter to this model_name (optional).")
+    brit_p.add_argument("--dataset", default=None, help="Label for output rows (default: CSV stem).")
+    brit_p.add_argument("--taus", nargs="+", type=float, default=[0.05, 0.10, 0.15, 0.20])
+    brit_p.add_argument("--raw", action="store_true", help="Also show the cautionary all-column flag.")
+    brit_p.add_argument("--out", default="pocketbench_out/normalized_brittleness.csv", help="Output CSV.")
+    brit_p.set_defaults(func=cmd_brittleness)
+
+    isr_p = sub.add_parser(
+        "isr",
+        help="Initialization Sensitivity Ratio: frame-moving vs featurization |delta| from a CSV.",
+    )
+    isr_p.add_argument("--metrics", required=True, help="Per-condition metrics CSV.")
+    isr_p.add_argument("--model", default=None, help="Filter to this model_name (optional).")
+    isr_p.add_argument("--metric", default="mean_qed", help="Metric to contrast (default mean_qed).")
+    isr_p.add_argument("--dataset", default=None, help="Label for output rows (default: CSV stem).")
+    isr_p.add_argument("--out", default="pocketbench_out/initialization_sensitivity.csv", help="Output CSV.")
+    isr_p.set_defaults(func=cmd_isr)
+
+    rep_p = sub.add_parser(
+        "report",
+        help="Run brittleness + crop-test + PBSI + ISR and write a paper-ready folder (no GPU).",
+    )
+    rep_p.add_argument("--metrics", required=True, help="Per-condition metrics CSV.")
+    rep_p.add_argument("--model", default=None, help="Filter to this model_name (optional).")
+    rep_p.add_argument("--crop-tag", default="crop_radius_minus_1.5", help="Crop condition tag.")
+    rep_p.add_argument("--dataset", default=None, help="Label for output rows (default: CSV stem).")
+    rep_p.add_argument("--out-dir", default="pocketbench_out", help="Output directory.")
+    rep_p.set_defaults(func=cmd_report)
 
     args = parser.parse_args(argv)
     code = args.func(args)

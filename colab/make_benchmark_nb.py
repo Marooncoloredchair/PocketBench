@@ -661,7 +661,44 @@ flg = flag_invariant_brittleness(
     metric_std_threshold=0.10,
 )
 st = brittleness_rate_from_flagged(flg)
-print("Brittleness @ tau=0.10:", dict(st))
+print("Brittleness @ tau=0.10 (ALL metric columns):", dict(st))
+
+# --- Normalized brittleness (alongside the raw all-column flag) ---------------
+# Raw counts (n_total/n_valid/...) and unnormalized SA (mean_sa/std_sa) trivially
+# exceed a [0,1]-tuned threshold; the normalized view isolates instability in the
+# chemistry the model is asked to optimize. This mirrors the CLI --normalized-only
+# flag so notebook runs and CLI runs report the same two numbers.
+NORM_METRICS = [m for m in ("validity", "uniqueness", "mean_qed", "std_qed") if m in df.columns]
+print()
+print("Normalized brittleness (metrics:", ", ".join(NORM_METRICS) + ")")
+print(f"  {'tau':>5} | {'raw_all_cols':>13} | {'normalized':>11}")
+for _tau in (0.05, 0.10, 0.15, 0.20):
+    _flg_raw = flag_invariant_brittleness(
+        df, invariant_tags=list(inv), original_tag="original", metric_std_threshold=_tau
+    )
+    _flg_norm = flag_invariant_brittleness(
+        df,
+        invariant_tags=list(inv),
+        original_tag="original",
+        metric_std_threshold=_tau,
+        metrics_subset=NORM_METRICS,
+    )
+    _sr = brittleness_rate_from_flagged(_flg_raw)["brittleness_rate"]
+    _sn = brittleness_rate_from_flagged(_flg_norm)["brittleness_rate"]
+    print(f"  {_tau:>5.2f} | {_sr:>13.3f} | {_sn:>11.3f}")
+
+flg_norm_10 = flag_invariant_brittleness(
+    df,
+    invariant_tags=list(inv),
+    original_tag="original",
+    metric_std_threshold=0.10,
+    metrics_subset=NORM_METRICS,
+)
+st_norm = brittleness_rate_from_flagged(flg_norm_10)
+print("Brittleness @ tau=0.10 (NORMALIZED metrics only):", dict(st_norm))
+norm_flagged_out = RES / (metrics_csv.stem.replace("metrics_per_condition", "metrics_flagged_normalized") + ".csv")
+flg_norm_10.to_csv(norm_flagged_out, index=False)
+print("Wrote", norm_flagged_out)
 
 ts_csv_out = RES / "_colab_threshold_sensitivity_merged.csv"
 ts_fig_out = RES / "_colab_threshold_sensitivity.pdf"
@@ -763,6 +800,182 @@ else:
 
 print()
 print("SUMMARY CELL FINISHED.")
+""")
+
+
+CELL_STRESS = dedent(r"""
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path("/content/sbdd-robust")
+base_cfg = ROOT / "configs" / "diffsbdd_real100_colab.yaml"
+if not base_cfg.is_file():
+    raise RuntimeError("Run Cell 8 first (need diffsbdd_real100_colab.yaml).")
+
+gen = ROOT / "analysis" / "make_brittleness_stress_config.py"
+if not gen.is_file():
+    raise RuntimeError(
+        "analysis/make_brittleness_stress_config.py missing from the clone. "
+        "Re-run Cell 4 against the latest PocketBench (this cell needs the mechanism-"
+        "targeted perturbation package that was pushed with the ISR metric)."
+    )
+
+# Build a Colab-ready stress config FROM the Colab config so paths/model/checkpoint and
+# the frozen pocket panel are inherited verbatim; only the perturbation block + run_id
+# change. DiffSBDD gets the featurization floor, the crop-radius boundary dose, and the
+# model-agnostic face_peel frame-shift (anchor_offset is a no-op for diffusion and is
+# omitted automatically).
+stress_cfg = ROOT / "configs" / "diffsbdd_real100_stress_colab.yaml"
+print("$ python", gen.name, "--base-config", base_cfg.name, "--out", stress_cfg.name)
+subprocess.check_call(
+    [sys.executable, str(gen), "--base-config", str(base_cfg), "--out", str(stress_cfg)]
+)
+
+STRESS_RUN_ID = "real100_stress"
+sidecar = ROOT / ".pb_paths.json"
+if sidecar.is_file():
+    info = json.loads(sidecar.read_text(encoding="utf-8"))
+    res_dir = Path(info["results"])
+    print("results dir:", res_dir, "(Drive)" if info.get("on_drive") else "(EPHEMERAL)")
+    prior = res_dir / f"metrics_per_condition__run{STRESS_RUN_ID}.csv"
+    if prior.is_file() and prior.stat().st_size > 0:
+        try:
+            import pandas as pd
+
+            print(f"RESUME: {len(pd.read_csv(prior))} stress conditions already done — skipped.")
+        except Exception:
+            print("RESUME: prior stress checkpoint unreadable — will start fresh.")
+    else:
+        print("Fresh stress run (no prior checkpoint).")
+
+os.environ["PYTHONUNBUFFERED"] = "1"
+os.environ["DIFFSBDD_PYTHON"] = "/usr/bin/python3"
+os.environ["DIFFSBDD_REPO"] = str(Path("/content/DiffSBDD"))
+os.environ["DIFFSBDD_CHECKPOINT"] = (
+    "/content/DiffSBDD/checkpoints/crossdocked_fullatom_cond.ckpt"
+)
+
+cmd = [sys.executable, "-u", "-m", "sbdd_robust", "run", "--config", str(stress_cfg), "--resume"]
+print("$ cd", ROOT)
+print("$", " ".join(cmd))
+print("NOTE: ~11 conditions x 100 pockets is many hours; re-run to resume after a disconnect.")
+
+proc = subprocess.Popen(
+    cmd, cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
+)
+if proc.stdout is None:
+    raise RuntimeError("subprocess.PIPE setup failed")
+for line in proc.stdout:
+    sys.stdout.write(line)
+    sys.stdout.flush()
+rc = proc.wait()
+if rc != 0:
+    raise RuntimeError("sbdd_robust (stress) exited " + str(rc))
+
+if sidecar.is_file():
+    res_dir = Path(json.loads(sidecar.read_text(encoding="utf-8"))["results"])
+else:
+    res_dir = Path("/content/sbdd_robust_work/data/results")
+stress_metrics = res_dir / f"metrics_per_condition__run{STRESS_RUN_ID}.csv"
+if not stress_metrics.is_file() or stress_metrics.stat().st_size == 0:
+    raise RuntimeError(
+        "Stress sweep finished but metrics CSV is missing/empty at "
+        + str(stress_metrics)
+        + ". Scroll up for [sbdd_robust] SKIP lines."
+    )
+import pandas as pd
+
+print(f"[stress sweep finished] OK — {len(pd.read_csv(stress_metrics))} condition rows in {stress_metrics.name}")
+""")
+
+
+CELL_ISR = dedent(r"""
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+ROOT = Path("/content/sbdd-robust")
+STRESS_RUN_ID = "real100_stress"
+
+sidecar = ROOT / ".pb_paths.json"
+if sidecar.is_file():
+    res_dir = Path(json.loads(sidecar.read_text(encoding="utf-8"))["results"])
+else:
+    res_dir = Path("/content/sbdd_robust_work/data/results")
+
+# (model_name, metrics_csv) pairs to contrast. DiffSBDD comes from the stress sweep just
+# run; if the Pocket2Mol notebook has already written its own stress CSV to Drive, fold it
+# in so ISR is computed for both architectures and the contrast is visible in one table.
+candidates: list[tuple[str, Path]] = [
+    ("diffsbdd", res_dir / f"metrics_per_condition__run{STRESS_RUN_ID}.csv"),
+]
+for p2m_dir in (
+    Path("/content/drive/MyDrive/sbdd-robust-results/pocket2mol_real100/work/results"),
+    Path("/content/drive/MyDrive/sbdd-robust-results/pocket2mol_real100/results"),
+):
+    p2m_csv = p2m_dir / f"metrics_per_condition__run{STRESS_RUN_ID}.csv"
+    if p2m_csv.is_file() and p2m_csv.stat().st_size > 0:
+        candidates.append(("pocket2mol", p2m_csv))
+        break
+
+out_dir = Path(DRIVE_OUT)
+out_dir.mkdir(parents=True, exist_ok=True)
+rows: list[pd.DataFrame] = []
+for model, csv in candidates:
+    if not csv.is_file() or csv.stat().st_size == 0:
+        print(f"skip {model}: no metrics at {csv}")
+        continue
+    one = out_dir / f"isr_{model}.csv"
+    cmd = [
+        sys.executable, "-m", "sbdd_robust", "isr",
+        "--metrics", str(csv),
+        "--model", model,
+        "--dataset", f"{model}_real100_stress",
+        "--out", str(one),
+    ]
+    print("$", " ".join(cmd))
+    proc = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True)
+    print(proc.stdout)
+    if proc.returncode != 0:
+        print(proc.stderr[-6000:])
+        # An older clone may lack the isr subcommand; fall back to the in-process metric.
+        from sbdd_robust import report as report_mod
+
+        df = pd.read_csv(csv)
+        if "model_name" in df.columns:
+            df = df[df["model_name"].astype(str).str.lower() == model]
+        rows.append(pd.DataFrame([report_mod.initialization_sensitivity(
+            df, dataset=f"{model}_real100_stress", model=model)]))
+        continue
+    if one.is_file():
+        rows.append(pd.read_csv(one))
+
+if not rows:
+    raise RuntimeError("No ISR rows computed — check the stress metrics CSV(s) above.")
+
+isr_all = pd.concat(rows, ignore_index=True)
+combined = out_dir / "isr_combined.csv"
+isr_all.to_csv(combined, index=False)
+
+cols = [c for c in ("model", "metric", "ISR", "ISR_ci95_lo", "ISR_ci95_hi",
+                    "frame_median_abs_delta", "featurization_median_abs_delta") if c in isr_all.columns]
+print()
+print("Initialization Sensitivity Ratio (ISR) — frame-moving vs featurization |Δ|")
+print(isr_all[cols].to_string(index=False))
+print()
+print("Interpretation: ISR >> 1 is the autoregressive first-atom signature (Pocket2Mol);")
+print("ISR ~ 1 is the translation/scale-robust diffusion signature (DiffSBDD).")
+print("Wrote", combined)
 """)
 
 
@@ -1323,6 +1536,10 @@ print("checkpoint bytes", dst.stat().st_size)
         md(
             "### Cell 11 — Statistical digest\n\n"
             "**Brittleness @ τ = 0.10** plus **coverage** (original **`n_valid>0`** row fraction).\n\n"
+            "Reports brittleness two ways at τ ∈ {0.05, 0.10, 0.15, 0.20}: the **raw all-column** flag "
+            "and the **normalized** flag (validity, uniqueness, mean_qed, std_qed only), and writes "
+            "**`metrics_flagged_normalized__run*.csv`**. Raw counts and unnormalized SA inflate the raw "
+            "flag; the normalized view isolates true chemistry instability (mirrors CLI `--normalized-only`).\n\n"
             "Runs **`analysis/threshold_sensitivity.py`** subprocess (duplicate metrics path satisfies the "
             "required Pocket2Mol slot so only the DiffSBDD curve matters) and parses **τ = 0.10** "
             "**`brittleness_rate_diffsbdd`** from **`_colab_threshold_sensitivity_merged.csv`**.\n\n"
@@ -1331,6 +1548,29 @@ print("checkpoint bytes", dst.stat().st_size)
         )
     )
     c.append(py(CELL11.strip("\n")))
+
+    c.append(
+        md(
+            "## ISR Stress Sweep — mechanism-targeted perturbations\n\n"
+            "The main run above measures robustness to **featurization noise** and the "
+            "**symmetric crop-radius** boundary. This section adds the *frame-moving* "
+            "perturbations that a senior collaborator's mechanism predicts should hurt an "
+            "**autoregressive** first-atom model far more than a **diffusion** model: an "
+            "asymmetric **`face_peel`** (shifts the pocket centroid / initialization frame) "
+            "plus, for Pocket2Mol only, an **`anchor_offset`** that moves the first-atom "
+            "seeding region with chemistry held fixed (a deliberate no-op for DiffSBDD).\n\n"
+            "**Cell 12** builds `diffsbdd_real100_stress_colab.yaml` from the Colab config "
+            "(inheriting paths, checkpoint, and the frozen 100-pocket panel) and runs the "
+            "DiffSBDD stress sweep — **streamed and resumable** like Cell 9.\n\n"
+            "**Cell 13** runs **`pocketbench isr`** on the combined metrics and prints the "
+            "**Initialization Sensitivity Ratio** = median |Δ| over frame-moving conditions "
+            "÷ median |Δ| over featurization conditions. If the Pocket2Mol notebook has "
+            "already written its stress CSV to Drive, both architectures appear in one table "
+            "so the **ISR ≫ 1 (Pocket2Mol) vs ISR ≈ 1 (DiffSBDD)** contrast is direct."
+        )
+    )
+    c.append(py(CELL_STRESS.strip("\n")))
+    c.append(py(CELL_ISR.strip("\n")))
 
     return {
         "nbformat": 4,

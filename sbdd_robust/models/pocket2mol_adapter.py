@@ -289,6 +289,16 @@ class Pocket2MolAdapter(BaseSBDDAdapter):
         ]
         if self.checkpoint is not None:
             argv.extend(["--checkpoint", str(self.checkpoint)])
+
+        # Initialization-frame perturbation (anchor_offset) rides on pocket metadata so the
+        # benchmark's perturbation system can drive the first-atom seeding region.
+        co = pocket.metadata.get("center_offset")
+        if co is not None:
+            argv.extend(["--center_offset", ",".join(str(float(v)) for v in co)])
+        bscale = pocket.metadata.get("bbox_scale")
+        if bscale is not None and float(bscale) != 1.0:
+            argv.extend(["--bbox_scale", str(float(bscale))])
+
         argv.extend(self.extra_args)
 
         env = os.environ.copy()

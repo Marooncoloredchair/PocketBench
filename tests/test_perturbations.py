@@ -9,6 +9,8 @@ import pytest
 from sbdd_robust.datasets.pocket_extraction import extract_pocket
 from sbdd_robust.datasets.pocket import Pocket
 from sbdd_robust.perturbations.invariant import atom_shuffle, coordinate_jitter, crop_radius
+from sbdd_robust.perturbations.invariant import anchor_offset as anchor_offset_mod
+from sbdd_robust.perturbations.invariant import directional_crop
 from sbdd_robust.perturbations.invariant import metadata_rename as meta_rename
 
 
@@ -127,3 +129,38 @@ def test_crop_radius_minus_fewer_atoms_coord_subset(extracted_pocket):
     for k, v in mm.items():
         assert k in mo
         assert np.allclose(mo[k], v, atol=1e-4, rtol=0)
+
+
+def test_face_peel_removes_one_side_and_shifts_centroid(extracted_pocket):
+    p = directional_crop.face_peel(extracted_pocket, fraction=0.25, axis="pca", direction="plus")
+    # Subset of residues, atom coords preserved for kept atoms (no jitter).
+    assert p.coords.shape[0] < extracted_pocket.coords.shape[0]
+    assert _residue_identity_multiset(p).keys() <= _residue_identity_multiset(extracted_pocket).keys()
+    mo, mp = _coord_map(extracted_pocket), _coord_map(p)
+    for k, v in mp.items():
+        assert k in mo and np.allclose(mo[k], v, atol=1e-4, rtol=0)
+    # Centroid moves opposite the peeled (+pca) face.
+    assert not np.allclose(p.coords.mean(axis=0), extracted_pocket.coords.mean(axis=0))
+    # resi_list rebuilt to the surviving residues so DiffSBDD sees the peel.
+    kept = {f"{str(c).strip()}:{int(rn)}" for c, rn in zip(p.chain_ids, p.residue_numbers)}
+    assert set(p.metadata["resi_list"]) == kept
+    assert p.metadata["perturbation_tag"] == "face_peel_0.25"
+    assert p.metadata["face_peel_residues_removed"] >= 1
+
+
+def test_face_peel_fraction_is_monotone(extracted_pocket):
+    small = directional_crop.face_peel(extracted_pocket, fraction=0.15, axis="pca")
+    big = directional_crop.face_peel(extracted_pocket, fraction=0.40, axis="pca")
+    assert big.coords.shape[0] <= small.coords.shape[0]
+    assert big.metadata["face_peel_residues_removed"] >= small.metadata["face_peel_residues_removed"]
+
+
+def test_anchor_offset_keeps_coords_records_offset(extracted_pocket):
+    p = anchor_offset_mod.anchor_offset(extracted_pocket, offset_angstrom=2.0, direction="pca")
+    # Coordinates and atom set are untouched; only the seeding frame metadata changes.
+    assert np.allclose(p.coords, extracted_pocket.coords)
+    assert p.coords.shape[0] == extracted_pocket.coords.shape[0]
+    off = np.asarray(p.metadata["center_offset"], dtype=float)
+    assert off.shape == (3,)
+    assert float(np.linalg.norm(off)) == pytest.approx(2.0, abs=1e-6)
+    assert p.metadata["perturbation_tag"] == "anchor_offset_2.0"

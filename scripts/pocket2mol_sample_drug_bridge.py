@@ -105,6 +105,19 @@ def main() -> None:
         default=None,
         help="Optional YAML base (default: <pocket2mol_root>/configs/sample_for_pdb.yml).",
     )
+    ap.add_argument(
+        "--center_offset",
+        type=str,
+        default=None,
+        help="Offset the derived pocket center by dx,dy,dz (A). Probes first-atom "
+        "initialization sensitivity without changing pocket atoms.",
+    )
+    ap.add_argument(
+        "--bbox_scale",
+        type=float,
+        default=1.0,
+        help="Multiply the derived bounding-box edge by this factor (default 1.0).",
+    )
     args, extra = ap.parse_known_args()
 
     root = _coerce_pocket2mol_root(args.pocket2mol_root)
@@ -139,6 +152,19 @@ def main() -> None:
         print("[sbdd_bridge_debug] merged sample:", cfg.get("sample"), file=sys.stderr, flush=True)
 
     center, bbox_size = _pocket_center_and_bbox(Path(args.pdb_path))
+
+    # Initialization-frame perturbation (anchor_offset): shift where the autoregressive
+    # first atom is seeded and/or rescale the box, without touching pocket atoms.
+    if args.center_offset:
+        try:
+            off = [float(v) for v in str(args.center_offset).split(",")]
+        except ValueError as exc:
+            raise ValueError(f"--center_offset must be 'dx,dy,dz'; got {args.center_offset!r}") from exc
+        if len(off) != 3:
+            raise ValueError(f"--center_offset needs 3 comma-separated values; got {args.center_offset!r}")
+        center = [c + o for c, o in zip(center, off)]
+    if args.bbox_scale and args.bbox_scale != 1.0:
+        bbox_size = float(bbox_size) * float(args.bbox_scale)
 
     with tempfile.TemporaryDirectory() as td:
         td_path = Path(td)
