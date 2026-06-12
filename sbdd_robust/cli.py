@@ -204,7 +204,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     done: set[tuple[str, str]] = set()
     if resume and metrics_csv.is_file():
         try:
+            if metrics_csv.stat().st_size == 0:
+                raise ValueError("checkpoint file is empty")
             prev = pd.read_csv(metrics_csv)
+            if prev.empty:
+                raise ValueError("checkpoint CSV has no rows")
             rows = prev.to_dict("records")
             done = {
                 (str(r.get("pocket_id")), str(r.get("perturbation_tag")))
@@ -221,8 +225,14 @@ def cmd_run(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             rows, done = [], set()
+            try:
+                metrics_csv.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def _flush_csv() -> None:
+        if not rows:
+            return
         # Atomic rewrite (temp + os.replace) so a disconnect mid-write can't corrupt
         # the checkpoint the next session resumes from.
         tmp = metrics_csv.with_name(metrics_csv.name + ".tmp")
@@ -299,8 +309,15 @@ def cmd_run(args: argparse.Namespace) -> int:
             print(f"[sbdd_robust] SKIP pocket {pid}: {e}", file=sys.stderr)
 
     _flush_csv()
+    if not rows:
+        raise RuntimeError(
+            f"No benchmark rows were written to {metrics_csv}. "
+            "All pockets may have failed (see SKIP lines above), or the run was interrupted "
+            "before the first condition finished. Re-run with skip_failed_pockets: false "
+            "to surface the first pocket error."
+        )
     # Re-read for consistent dtypes (resumed rows came back as strings/NaN from CSV).
-    df = pd.read_csv(metrics_csv) if metrics_csv.is_file() and rows else pd.DataFrame(rows)
+    df = pd.read_csv(metrics_csv)
 
     flagged = rob_mod.flag_invariant_brittleness(
         df,

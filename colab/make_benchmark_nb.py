@@ -459,10 +459,16 @@ if sidecar.is_file():
         try:
             import pandas as pd
 
-            ndone = len(pd.read_csv(prior))
-            print(f"RESUME: found {ndone} completed conditions — these will be skipped.")
+            if prior.stat().st_size == 0:
+                print("RESUME: prior checkpoint is empty — will start fresh.")
+            else:
+                ndone = len(pd.read_csv(prior))
+                if ndone <= 0:
+                    print("RESUME: prior checkpoint has no rows — will start fresh.")
+                else:
+                    print(f"RESUME: found {ndone} completed conditions — these will be skipped.")
         except Exception:
-            print("RESUME: prior checkpoint present; completed conditions will be skipped.")
+            print("RESUME: prior checkpoint unreadable — will start fresh.")
     else:
         print("Fresh run (no prior checkpoint).")
 
@@ -496,7 +502,30 @@ for line in proc.stdout:
 rc = proc.wait()
 if rc != 0:
     raise RuntimeError("sbdd_robust exited " + str(rc))
-print("[benchmark finished] OK")
+
+# Guard against silent empty runs (all pockets skipped/failed).
+_sidecar2 = ROOT / ".pb_paths.json"
+_res = (
+    Path(json.loads(_sidecar2.read_text(encoding="utf-8"))["results"])
+    if _sidecar2.is_file()
+    else Path("/content/sbdd_robust_work/data/results")
+)
+_metrics = _res / "metrics_per_condition__runreal100.csv"
+if not _metrics.is_file() or _metrics.stat().st_size == 0:
+    raise RuntimeError(
+        "Benchmark finished but metrics CSV is missing/empty at "
+        + str(_metrics)
+        + ". Scroll up for [sbdd_robust] SKIP lines or re-run with skip_failed_pockets: false."
+    )
+import pandas as pd
+
+_nrows = len(pd.read_csv(_metrics))
+print(f"[benchmark finished] OK — {_nrows} condition rows in {_metrics.name}")
+if _nrows < 500:
+    print(
+        f"WARN: expected up to 500 rows (100 pockets x 5 perturbations); only {_nrows}. "
+        "Re-run this cell to resume remaining conditions."
+    )
 """)
 
 
@@ -576,9 +605,27 @@ if not csvs:
 metrics_csv = max(csvs, key=lambda p: p.stat().st_mtime)
 print("Using:", metrics_csv)
 
+if metrics_csv.stat().st_size == 0:
+    raise RuntimeError(
+        f"{metrics_csv} is empty. Run Cell 9 first and wait for "
+        "'[benchmark finished] OK — N condition rows'. "
+        "If Cell 9 failed, scroll up for [sbdd_robust] SKIP lines."
+    )
+
 import pandas as pd
 
-df_raw = pd.read_csv(metrics_csv)
+try:
+    df_raw = pd.read_csv(metrics_csv)
+except pd.errors.EmptyDataError as exc:
+    raise RuntimeError(
+        f"{metrics_csv} has no data columns. Run Cell 9 to generate metrics, "
+        "or delete the empty checkpoint and re-run Cell 9."
+    ) from exc
+if df_raw.empty:
+    raise RuntimeError(
+        f"{metrics_csv} has zero rows. Run Cell 9 and wait until it reports "
+        "500 condition rows (or re-run to resume a partial run)."
+    )
 df = df_raw.copy()
 for c in ("brittle_invariant", "brittleness_note"):
     if c in df.columns:
