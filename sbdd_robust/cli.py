@@ -570,7 +570,12 @@ def cmd_isr(args: argparse.Namespace) -> int:
     df = _load_metrics_csv(args.metrics, args.model)
     name = args.dataset or Path(args.metrics).stem
     row = report_mod.initialization_sensitivity(
-        df, metric=args.metric, dataset=name, model=args.model
+        df,
+        metric=args.metric,
+        frame_tags=getattr(args, "frame_tags", None),
+        featurization_tags=getattr(args, "featurization_tags", None),
+        dataset=name,
+        model=args.model,
     )
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame([row]).to_csv(args.out, index=False)
@@ -701,6 +706,20 @@ def main(argv: List[str] | None = None) -> None:
     isr_p.add_argument("--model", default=None, help="Filter to this model_name (optional).")
     isr_p.add_argument("--metric", default="mean_qed", help="Metric to contrast (default mean_qed).")
     isr_p.add_argument("--dataset", default=None, help="Label for output rows (default: CSV stem).")
+    isr_p.add_argument(
+        "--frame-tags",
+        nargs="+",
+        default=None,
+        help="Override the frame-moving tags (e.g. for a matched cross-model comparison, "
+        "pass only the tags both models share like crop_radius_minus_1.5 face_peel_0.25). "
+        "Default: auto-detect all face_peel/anchor_offset/crop_radius_minus tags present.",
+    )
+    isr_p.add_argument(
+        "--featurization-tags",
+        nargs="+",
+        default=None,
+        help="Override the featurization tags (default: atom_shuffle coordinate_jitter).",
+    )
     isr_p.add_argument("--out", default="pocketbench_out/initialization_sensitivity.csv", help="Output CSV.")
     isr_p.set_defaults(func=cmd_isr)
 
