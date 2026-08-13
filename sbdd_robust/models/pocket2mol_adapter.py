@@ -13,6 +13,8 @@ from rdkit import Chem
 from rdkit.Chem import rdDetermineBonds
 
 from sbdd_robust.datasets.pdb_io import write_pocket_pdb
+from sbdd_robust.datasets.pdb_merge import merge_pocket_into_full_pdb
+from sbdd_robust.models.pocket2mol_ghosts import ghost_keys_for_frame_perturbation
 from sbdd_robust.datasets.pocket import Pocket
 from sbdd_robust.models.base_adapter import BaseSBDDAdapter
 
@@ -229,6 +231,32 @@ def mols_from_pocket2mol_payload(
     return mols
 
 
+def _ligand_centered_bbox(
+    pocket: Pocket,
+    *,
+    margin: float = 3.0,
+    min_box: float = 23.0,
+    max_box: float = 34.0,
+) -> float:
+    """Cubic bbox edge for Pocket2Mol from pocket atoms around the ligand centroid."""
+    if pocket.ligand_centroid is not None:
+        center = np.asarray(pocket.ligand_centroid, dtype=np.float64)
+    else:
+        center = pocket.coords.mean(axis=0)
+    extent = float(np.max(np.linalg.norm(pocket.coords - center, axis=1)))
+    return float(max(min_box, min(max_box, 2.0 * extent + 2.0 * margin)))
+
+
+def _should_mask_bbox_ghosts(pocket: Pocket) -> bool:
+    """Drop full-PDB atoms inside the Pocket2Mol box that crop / face-peel removed."""
+    tag = str(pocket.metadata.get("perturbation_tag", "original"))
+    if tag in ("original", "atom_shuffle", "coordinate_jitter"):
+        return False
+    if tag.startswith("anchor_offset"):
+        return False
+    return tag.startswith("crop_radius") or tag.startswith("face_peel")
+
+
 class Pocket2MolAdapter(BaseSBDDAdapter):
     """
     Wrap Pocket2Mol inference via ``sample_drug.py`` (``arneschneuing/Pocket2Mol`` or
@@ -253,6 +281,7 @@ class Pocket2MolAdapter(BaseSBDDAdapter):
         script_path: Optional[Path] = None,
         extra_args: Optional[Sequence[str]] = None,
         sanitize: bool = True,
+        full_pdb: Optional[Path] = None,
     ) -> None:
         self.repo_root = Path(repo_root).resolve()
         self.checkpoint = Path(checkpoint).resolve() if checkpoint is not None else None
@@ -264,19 +293,44 @@ class Pocket2MolAdapter(BaseSBDDAdapter):
         )
         self.extra_args = list(extra_args) if extra_args else []
         self.sanitize = bool(sanitize)
+        self.full_pdb = Path(full_pdb).resolve() if full_pdb is not None else None
         if not self.script_path.is_file():
             raise FileNotFoundError(
                 f"Pocket2Mol sample script not found at {self.script_path}. "
                 "Set model.script_path if your fork names the entrypoint differently."
             )
 
-    def generate(self, pocket: Pocket, n_samples: int, workdir: Path) -> List[Chem.Mol]:
-        workdir.mkdir(parents=True, exist_ok=True)
-        pdb_path = workdir / f"{pocket.pocket_id}_pocket2mol_in.pdb"
-        write_pocket_pdb(pocket, pdb_path)
+    def _resolve_pdb_path(
+        self,
+        pocket: Pocket,
+        workdir: Path,
+        *,
+        mask_bbox: bool,
+    ) -> tuple[Path, Optional[Path], float]:
+        bbox_size = _ligand_centered_bbox(pocket)
+        merged_tmp: Optional[Path] = None
+        if self.full_pdb is not None:
+            ghosts = ghost_keys_for_frame_perturbation(pocket) if mask_bbox else None
+            merged_tmp = merge_pocket_into_full_pdb(
+                pocket,
+                self.full_pdb,
+                bbox_size=bbox_size if mask_bbox else None,
+                ghost_atom_keys=ghosts,
+            )
+            pdb_path = merged_tmp
+        else:
+            pdb_path = workdir / f"{pocket.pocket_id}_pocket2mol_in.pdb"
+            write_pocket_pdb(pocket, pdb_path)
+        return pdb_path, merged_tmp, bbox_size
 
-        out_pt = workdir / f"{pocket.pocket_id}_pocket2mol_out.pt"
-
+    def _run_subprocess(
+        self,
+        pocket: Pocket,
+        pdb_path: Path,
+        out_pt: Path,
+        n_samples: int,
+        bbox_size: float,
+    ) -> List[Chem.Mol]:
         argv: List[str] = [
             str(self.python_exe),
             str(self.script_path),
@@ -290,11 +344,20 @@ class Pocket2MolAdapter(BaseSBDDAdapter):
         if self.checkpoint is not None:
             argv.extend(["--checkpoint", str(self.checkpoint)])
 
-        # Initialization-frame perturbation (anchor_offset) rides on pocket metadata so the
-        # benchmark's perturbation system can drive the first-atom seeding region.
+        if pocket.ligand_centroid is not None:
+            lc = pocket.ligand_centroid
+            center_s = ",".join(str(float(v)) for v in lc)
+            argv.extend([f"--center={center_s}", "--bbox_size", str(bbox_size)])
+
         co = pocket.metadata.get("center_offset")
         if co is not None:
-            argv.extend(["--center_offset", ",".join(str(float(v)) for v in co)])
+            if isinstance(co, str):
+                offset_s = co.strip()
+            else:
+                if hasattr(co, "tolist"):
+                    co = co.tolist()
+                offset_s = ",".join(str(float(v)) for v in co)
+            argv.append(f"--center_offset={offset_s}")
         bscale = pocket.metadata.get("bbox_scale")
         if bscale is not None and float(bscale) != 1.0:
             argv.extend(["--bbox_scale", str(float(bscale))])
@@ -329,3 +392,27 @@ class Pocket2MolAdapter(BaseSBDDAdapter):
 
         raw = load_pocket2mol_pt(out_pt)
         return mols_from_pocket2mol_payload(raw, sanitize=self.sanitize)
+
+    def generate(self, pocket: Pocket, n_samples: int, workdir: Path) -> List[Chem.Mol]:
+        workdir.mkdir(parents=True, exist_ok=True)
+        out_pt = workdir / f"{pocket.pocket_id}_pocket2mol_out.pt"
+        mask_bbox = self.full_pdb is not None and _should_mask_bbox_ghosts(pocket)
+        # Frame perturbations must not fall back to unmasked full PDB (ghost atoms).
+        attempts = [True] if mask_bbox else [False]
+
+        for use_mask in attempts:
+            merged_tmp: Optional[Path] = None
+            try:
+                pdb_path, merged_tmp, bbox_size = self._resolve_pdb_path(
+                    pocket, workdir, mask_bbox=use_mask
+                )
+                mols = self._run_subprocess(pocket, pdb_path, out_pt, n_samples, bbox_size)
+                if mols or not use_mask or not mask_bbox:
+                    return mols
+            finally:
+                if merged_tmp is not None:
+                    try:
+                        merged_tmp.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+        return []

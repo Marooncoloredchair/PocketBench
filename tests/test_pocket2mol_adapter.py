@@ -28,6 +28,7 @@ def _tiny_pocket() -> Pocket:
         residue_names=np.array(["ALA"], dtype=object),
         residue_numbers=np.array([1], dtype=np.int64),
         chain_ids=np.array(["A"], dtype=object),
+        ligand_centroid=np.array([0.0, 0.0, 0.0], dtype=np.float64),
     )
 
 
@@ -94,6 +95,8 @@ def test_pocket2mol_adapter_mock_subprocess_writes_pt(mock_run, fake_repo: Path,
     assert "--num_samples" in cmd and "2" in cmd
     assert "--result_path" in cmd
     assert "--checkpoint" in cmd
+    assert any(tok.startswith("--center=") for tok in cmd)
+    assert "--bbox_size" in cmd
 
     env = captured["kwargs"]["env"]
     assert "PYTHONPATH" in env

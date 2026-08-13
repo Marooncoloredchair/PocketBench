@@ -50,8 +50,16 @@ def _pocket_center_and_bbox(
     margin: float = 3.0,
     min_box: float = 23.0,
     max_box: float = 34.0,
+    *,
+    center_override: list[float] | None = None,
 ) -> tuple[list[float], float]:
-    """Centroid and cubic bbox edge from protein ATOM records; cap box for full-assembly PDBs."""
+    """Centroid and cubic bbox edge from protein ATOM records; cap box for full-assembly PDBs.
+
+  When ``center_override`` is set (typically the cognate ligand centroid), the bbox
+  extent is measured from that center using atoms present in ``pdb_path``. For full
+  structure files the caller should pass an explicit ``--bbox_size`` derived from the
+  extracted pocket atoms instead of relying on this scan.
+    """
     xs, ys, zs = [], [], []
     with open(pdb_path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
@@ -79,8 +87,11 @@ def _pocket_center_and_bbox(
         raise RuntimeError(
             f"No protein ATOM heavy atoms in {pdb_path}; use a pocket-only PDB or a file with ATOM records."
         )
-    c = np.array([np.mean(xs), np.mean(ys), np.mean(zs)])
     pts = np.stack([xs, ys, zs], axis=1)
+    if center_override is not None:
+        c = np.asarray(center_override, dtype=np.float64)
+    else:
+        c = np.array([np.mean(xs), np.mean(ys), np.mean(zs)])
     extent = float(np.max(np.abs(pts - c)))
     bbox = float(max(min_box, min(max_box, 2.0 * extent + 2.0 * margin)))
     return c.tolist(), bbox
@@ -104,6 +115,20 @@ def main() -> None:
         type=Path,
         default=None,
         help="Optional YAML base (default: <pocket2mol_root>/configs/sample_for_pdb.yml).",
+    )
+    ap.add_argument(
+        "--center",
+        type=str,
+        default=None,
+        help="Override pocket center as x,y,z (Å). Use the cognate ligand centroid for "
+        "full-structure PDBs; default derives center from pocket ATOM coordinates.",
+    )
+    ap.add_argument(
+        "--bbox_size",
+        type=float,
+        default=None,
+        help="Override cubic bounding-box edge (Å). Required when --center is set on a "
+        "full protein PDB (bbox cannot be inferred from the whole structure).",
     )
     ap.add_argument(
         "--center_offset",
@@ -151,7 +176,22 @@ def main() -> None:
         print("[sbdd_bridge_debug] base_config:", base_cfg_path, file=sys.stderr, flush=True)
         print("[sbdd_bridge_debug] merged sample:", cfg.get("sample"), file=sys.stderr, flush=True)
 
-    center, bbox_size = _pocket_center_and_bbox(Path(args.pdb_path))
+    pdb_path = Path(args.pdb_path)
+    if args.center:
+        try:
+            center = [float(v) for v in str(args.center).split(",")]
+        except ValueError as exc:
+            raise ValueError(f"--center must be 'x,y,z'; got {args.center!r}") from exc
+        if len(center) != 3:
+            raise ValueError(f"--center needs 3 comma-separated values; got {args.center!r}")
+        if args.bbox_size is not None:
+            bbox_size = float(args.bbox_size)
+        else:
+            _, bbox_size = _pocket_center_and_bbox(pdb_path, center_override=center)
+    else:
+        center, bbox_size = _pocket_center_and_bbox(pdb_path)
+        if args.bbox_size is not None:
+            bbox_size = float(args.bbox_size)
 
     # Initialization-frame perturbation (anchor_offset): shift where the autoregressive
     # first atom is seeded and/or rescale the box, without touching pocket atoms.
@@ -221,7 +261,13 @@ def main() -> None:
                 "refusing to copy only samples_all.pt (driver cannot unpickle without Pocket2Mol on PYTHONPATH)."
             )
         sidecar = args.result_path.with_name(f"{args.result_path.stem}_smiles.txt")
-        shutil.copyfile(sm_path, sidecar)
+        # Drop blank lines Pocket2Mol occasionally writes when reconstruction yields no SMILES.
+        lines = [
+            ln
+            for ln in sm_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+            if ln.strip()
+        ]
+        sidecar.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 
 
 if __name__ == "__main__":
