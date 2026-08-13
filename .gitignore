@@ -28,3 +28,7 @@ NMI_PROGRESS.md
 paper/NMI_SUBMISSION_CHECKLIST.md
 paper/results_stub.md
 data/results/*_run_log.txt
+
+# Cluster site-local overrides (do not commit secrets/paths)
+cluster/env.local.sh
+cluster_runs/

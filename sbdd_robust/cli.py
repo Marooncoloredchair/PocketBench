@@ -20,11 +20,12 @@ def _register_cfg_resolvers() -> None:
 
     def _env_resolver(key: str) -> str:
         val = os.environ.get(key)
-        if val is None or val == "":
+        if val is None:
             raise ValueError(
                 f"Environment variable {key!r} is not set but is required by the config "
-                f"(${{env:{key}}}). For DiffSBDD 47-pocket reruns export DIFFSBDD_REPO, "
-                "DIFFSBDD_CHECKPOINT, and DIFFSBDD_PYTHON (see configs/experiments/README.md)."
+                f"(${{env:{key}}}). For DiffSBDD panel runs export DIFFSBDD_REPO, "
+                "DIFFSBDD_CHECKPOINT, and optionally DIFFSBDD_PYTHON "
+                "(see cluster/env.example.sh and configs/experiments/README.md)."
             )
         return val
 
@@ -81,12 +82,15 @@ def _build_adapter(cfg: Any, pocket_cfg: Any, root: Path) -> BaseSBDDAdapter:
         ref = pocket_cfg.get("ref_ligand") or mcfg.get("ref_ligand")
         ref = str(ref).strip() if ref else None
         extras = mcfg.get("extra_args")
+        python_exe = mcfg.get("python_exe")
+        if python_exe is not None and str(python_exe).strip() == "":
+            python_exe = None
         return DiffSBDDAdapter(
             repo_root=_resolve(root, mcfg.repo_root),
             checkpoint=_resolve(root, mcfg.checkpoint),
             ref_ligand=ref,
             full_pdb=_resolve(root, full_pdb),
-            python_exe=mcfg.get("python_exe"),
+            python_exe=python_exe,
             sanitize=bool(mcfg.get("sanitize", False)),
             resamplings=int(mcfg.get("resamplings", 10)),
             jump_length=int(mcfg.get("jump_length", 1)),
@@ -101,6 +105,7 @@ def _build_adapter(cfg: Any, pocket_cfg: Any, root: Path) -> BaseSBDDAdapter:
         ckpt = mcfg.get("checkpoint")
         sp = mcfg.get("script_path")
         extras = mcfg.get("extra_args")
+        full_pdb = getattr(pocket_cfg, "full_pdb", None) or pocket_cfg.get("full_pdb")
         return Pocket2MolAdapter(
             repo_root=_resolve(root, mcfg.repo_root),
             checkpoint=_resolve(root, ckpt) if ckpt else None,
@@ -108,6 +113,7 @@ def _build_adapter(cfg: Any, pocket_cfg: Any, root: Path) -> BaseSBDDAdapter:
             script_path=_resolve(root, sp) if sp else None,
             extra_args=list(extras) if extras is not None else None,
             sanitize=bool(mcfg.get("sanitize", True)),
+            full_pdb=_resolve(root, full_pdb) if full_pdb else None,
         )
     if typ == "targetdiff":
         cfg_yml = mcfg.get("config_yaml") or mcfg.get("config")
@@ -217,6 +223,8 @@ def _apply_perturbations(
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    # Optional SLURM array / shard mode: run one pocket by 0-based index and write a
+    # per-task metrics CSV so parallel nodes do not race on a shared file.
     cfg_path = Path(args.config).resolve()
     cfg = OmegaConf.load(cfg_path)
     root = Path(cfg.get("project_root", cfg_path.parent.parent)).resolve()
@@ -231,9 +239,29 @@ def cmd_run(args: argparse.Namespace) -> int:
     resume = bool(getattr(args, "resume", False) or cfg.get("resume", False))
     normalized_only = bool(getattr(args, "normalized_only", False) or cfg.get("normalized_only", False))
     normalized_metrics = list(cfg.get("normalized_metrics", NORMALIZED_METRICS))
-    metrics_csv = results_dir / f"metrics_per_condition__run{run_id}.csv"
 
     pockets_cfg: List[Any] = list(cfg.pockets)
+    pocket_index = getattr(args, "pocket_index", None)
+    if pocket_index is not None:
+        pocket_index = int(pocket_index)
+        if pocket_index < 0 or pocket_index >= len(pockets_cfg):
+            raise SystemExit(
+                f"--pocket-index {pocket_index} out of range for {len(pockets_cfg)} pockets "
+                f"in {cfg_path}"
+            )
+        pockets_cfg = [pockets_cfg[pocket_index]]
+        print(
+            f"[sbdd_robust] array shard: pocket_index={pocket_index} "
+            f"id={pockets_cfg[0].id}",
+            file=sys.stderr,
+        )
+
+    # Per-task shard CSVs avoid races when SLURM array tasks write in parallel.
+    if pocket_index is not None:
+        metrics_csv = results_dir / f"metrics_per_condition__run{run_id}__p{pocket_index:04d}.csv"
+    else:
+        metrics_csv = results_dir / f"metrics_per_condition__run{run_id}.csv"
+
     pert_specs = [OmegaConf.to_container(p, resolve=True) for p in cfg.perturbations]
     pert_tags = [str(s.get("tag", s.get("type", "unknown"))) for s in pert_specs]
     invariant_tags = list(cfg.get("invariant_tags", ["atom_shuffle", "coordinate_jitter"]))
@@ -660,6 +688,17 @@ def main(argv: List[str] | None = None) -> None:
             "Additionally emit a brittleness flag computed on normalized chemistry metrics only "
             "(validity, uniqueness, mean_qed, std_qed), written alongside the raw all-column flag. "
             "Separates true chemistry instability from raw-count / SA-scale artefacts."
+        ),
+    )
+    run_p.add_argument(
+        "--pocket-index",
+        dest="pocket_index",
+        type=int,
+        default=None,
+        help=(
+            "0-based index into config pockets:[] — run that pocket only. "
+            "Used by SLURM array tasks (pass $SLURM_ARRAY_TASK_ID). "
+            "Writes metrics_per_condition__run{id}__pNNNN.csv instead of the panel CSV."
         ),
     )
     run_p.set_defaults(func=cmd_run)
