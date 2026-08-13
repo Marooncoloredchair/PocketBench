@@ -86,35 +86,48 @@ def _prepare_receptor_pdbqt(receptor_pdb: Path, out_pdbqt: Path) -> tuple[bool, 
         [
             sys.executable,
             "-m",
+            "meeko.cli.mk_prepare_receptor",
+            "--read_pdb",
+            str(receptor_pdb),
+            "--write_pdbqt",
+            str(out_pdbqt),
+            # Cropped pocket PDBs often lack full residue templates; allow drop.
+            "--allow_bad_res",
+        ],
+        # Older meeko layout (pre-0.7) used meeko.mk_prepare_receptor
+        [
+            sys.executable,
+            "-m",
             "meeko.mk_prepare_receptor",
             "--read_pdb",
             str(receptor_pdb),
             "--write_pdbqt",
             str(out_pdbqt),
+            "--allow_bad_res",
         ],
     ):
+        label = argv[2]
         try:
             subprocess.run(argv, check=True, capture_output=True, timeout=120)
             if out_pdbqt.is_file():
                 ok_s, rs = _strip_receptor_pdbqt_for_vina_rigid(out_pdbqt)
                 if ok_s:
-                    return True, ""
-                failures.append(f"meeko.mk_prepare_receptor: rigid strip failed: {rs}")
+                    return True, label
+                failures.append(f"{label}: rigid strip failed: {rs}")
                 try:
                     out_pdbqt.unlink()
                 except OSError:
                     pass
         except FileNotFoundError as e:
-            failures.append(f"meeko.mk_prepare_receptor: FileNotFoundError: {e}")
+            failures.append(f"{label}: FileNotFoundError: {e}")
             continue
         except subprocess.CalledProcessError as e:
             failures.append(
-                "meeko.mk_prepare_receptor: exit "
-                f"{e.returncode}; stderr={_stderr_tail(e.stderr)}"
+                f"{label}: exit {e.returncode}; stderr={_stderr_tail(e.stderr)}"
             )
             continue
         except subprocess.TimeoutExpired:
-            failures.append("meeko.mk_prepare_receptor: timeout (120s)")
+            failures.append(f"{label}: timeout (120s)")
             continue
     mk = shutil.which("mk_prepare_receptor")
     if mk:
@@ -128,7 +141,7 @@ def _prepare_receptor_pdbqt(receptor_pdb: Path, out_pdbqt: Path) -> tuple[bool, 
             if out_pdbqt.is_file():
                 ok_s, rs = _strip_receptor_pdbqt_for_vina_rigid(out_pdbqt)
                 if ok_s:
-                    return True, ""
+                    return True, "mk_prepare_receptor"
                 failures.append(f"mk_prepare_receptor: rigid strip failed: {rs}")
                 try:
                     out_pdbqt.unlink()
@@ -154,7 +167,7 @@ def _prepare_receptor_pdbqt(receptor_pdb: Path, out_pdbqt: Path) -> tuple[bool, 
             if out_pdbqt.is_file():
                 ok_s, rs = _strip_receptor_pdbqt_for_vina_rigid(out_pdbqt)
                 if ok_s:
-                    return True, ""
+                    return True, "obabel"
                 failures.append(f"obabel: rigid strip failed: {rs}")
                 try:
                     out_pdbqt.unlink()
@@ -180,7 +193,7 @@ def _prepare_receptor_pdbqt(receptor_pdb: Path, out_pdbqt: Path) -> tuple[bool, 
             if out_pdbqt.is_file():
                 ok_s, rs = _strip_receptor_pdbqt_for_vina_rigid(out_pdbqt)
                 if ok_s:
-                    return True, ""
+                    return True, "prepare_receptor4.py"
                 failures.append(f"prepare_receptor4.py: rigid strip failed: {rs}")
                 try:
                     out_pdbqt.unlink()
@@ -422,6 +435,8 @@ def score_molecules(
                 )
                 warned = True
             return [None] * n
+
+        vlog(f"receptor PDBQT prep OK via {rec_reason}")
 
         out: list[float | None] = []
         for i, mol in enumerate(mols):

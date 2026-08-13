@@ -28,7 +28,21 @@ Use PI work storage (not `/work/$USER`):
 
 GPU partition: `uri-gpu`, long QoS: `-q long`. See also `D:\BNDF\scripts\unity\`.
 
+## Resume from a partial panel CSV (Job B)
+
+If a non-array run already wrote `metrics_per_condition__run{ID}.csv` for some
+pockets, seed shard files before submitting so `--resume` skips them:
+
+```bash
+python cluster/seed_array_shards_from_panel.py \
+  --panel data/results/metrics_per_condition__runpocket2mol_real47_full_v2.csv \
+  --config configs/cluster/pocket2mol_real47_v2_resume.yaml \
+  --results-dir "$POCKETBENCH_RESULTS" \
+  --run-id pocket2mol_real47_full_v2
+```
+
 ## Quick start
+
 
 ```bash
 cd /work/pi_nzawia_uri_edu/pocketbench/repo   # or your clone

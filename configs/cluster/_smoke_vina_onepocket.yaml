@@ -1,0 +1,36 @@
+# Local / CI smoke: one pocket, original only, n=5, Vina on.
+# Not for cluster submission.
+project_root: .
+seed: 0
+run_id: smoke_vina_onepocket
+paths:
+  results: data/results
+  generations: data/generations
+extraction_radius: 8.0
+skip_failed_pockets: false
+compute_docking: true
+vina_cpu: 4
+docking_verbose: true
+resume: false
+pockets:
+- id: 7HZW
+  pdb: data/raw/real100/7hzw.pdb
+  ligand_chain: C
+  ligand_resseq: 301
+  full_pdb: data/raw/real100/7hzw.pdb
+  ref_ligand: C:301
+perturbations:
+- tag: original
+  type: identity
+model:
+  type: diffsbdd
+  n_samples: 5
+  repo_root: ${env:DIFFSBDD_REPO}
+  checkpoint: ${env:DIFFSBDD_CHECKPOINT}
+  python_exe: ${env:DIFFSBDD_PYTHON}
+  resamplings: 10
+  jump_length: 1
+  sanitize: false
+  extra_args:
+  - --device
+  - cuda

@@ -21,6 +21,9 @@ def _register_cfg_resolvers() -> None:
     def _env_resolver(key: str) -> str:
         val = os.environ.get(key)
         if val is None:
+            # Optional interpreter overrides may be omitted (use process python).
+            if key.endswith("_PYTHON"):
+                return ""
             raise ValueError(
                 f"Environment variable {key!r} is not set but is required by the config "
                 f"(${{env:{key}}}). For DiffSBDD panel runs export DIFFSBDD_REPO, "
@@ -106,10 +109,13 @@ def _build_adapter(cfg: Any, pocket_cfg: Any, root: Path) -> BaseSBDDAdapter:
         sp = mcfg.get("script_path")
         extras = mcfg.get("extra_args")
         full_pdb = getattr(pocket_cfg, "full_pdb", None) or pocket_cfg.get("full_pdb")
+        python_exe = mcfg.get("python_exe")
+        if python_exe is not None and str(python_exe).strip() == "":
+            python_exe = None
         return Pocket2MolAdapter(
             repo_root=_resolve(root, mcfg.repo_root),
             checkpoint=_resolve(root, ckpt) if ckpt else None,
-            python_exe=mcfg.get("python_exe"),
+            python_exe=python_exe,
             script_path=_resolve(root, sp) if sp else None,
             extra_args=list(extras) if extras is not None else None,
             sanitize=bool(mcfg.get("sanitize", True)),

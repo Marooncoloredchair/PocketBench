@@ -29,6 +29,8 @@ export DIFFSBDD_CHECKPOINT="${DIFFSBDD_CHECKPOINT:-/work/pi_nzawia_uri_edu/pocke
 export DIFFSBDD_PYTHON="${DIFFSBDD_PYTHON:-}"
 export POCKET2MOL_REPO="${POCKET2MOL_REPO:-/work/pi_nzawia_uri_edu/pocketbench/Pocket2Mol}"
 export POCKET2MOL_CHECKPOINT="${POCKET2MOL_CHECKPOINT:-/work/pi_nzawia_uri_edu/pocketbench/ckpts/pretrained_Pocket2Mol.pt}"
+# Pocket2Mol often needs a separate older Python env
+export POCKET2MOL_PYTHON="${POCKET2MOL_PYTHON:-}"
 
 # --- SLURM defaults (Unity) ---
 export POCKETBENCH_PARTITION="${POCKETBENCH_PARTITION:-uri-gpu}"
@@ -39,5 +41,5 @@ export POCKETBENCH_CPUS="${POCKETBENCH_CPUS:-4}"
 export POCKETBENCH_MEM="${POCKETBENCH_MEM:-32G}"
 # EPFL: often also export POCKETBENCH_ACCOUNT=…
 
-# --- optional docking ---
+# --- optional docking (Job A) ---
 export VINA_EXE="${VINA_EXE:-}"
