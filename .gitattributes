@@ -1,0 +1,3 @@
+# Keep SLURM/bash helpers POSIX-safe when checked out on Windows
+cluster/*.sh text eol=lf
+cluster/*.slurm text eol=lf
