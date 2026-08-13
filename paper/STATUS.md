@@ -35,7 +35,7 @@ Internal calibration note: `paper/monday_honest_summary.md`.
 | Item | Status |
 |------|--------|
 | Pocket2Mol **corrected** real47 coverage | Partial: **19/47** pockets run; **16/19** valid on `original`; **no** corrected full-panel number yet |
-| DiffSBDD real100 **SDF generations** | Metrics exist; full 99-pocket SDF archive may be missing (locate before Vina rescoring) |
+| DiffSBDD real100 **SDF generations** | **Must regenerate for full panel:** local `data/generations/run_diffsbdd_real100` has SDFs for **10/99** pockets only; Drive `sbdd-robust-results/real100/` not mountable from this machine (sign-in required). Metrics CSV is in-repo (`data/results/metrics_per_condition__runreal100.csv`) |
 | Cross-model ISR ranking (P2M / TargetDiff) | Preliminary; harness fixed on matched4; not panel-scale |
 | Conditioning-faithfulness (PocketBench) | Not started in this repo |
 
