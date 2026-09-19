@@ -1,16 +1,6 @@
 Pocket2Mol real47 original-condition coverage
 
-baseline_v1: 13/47 pockets (27.7%) mean_validity=0.277
-  source: metrics_per_condition__runpocket2mol_real47_full.csv
-  note: SUPERSEDED — largely adapter input-format artefact
-        (pocket-only PDBs vs full structure + ligand-centered bbox).
-        Do not use 13/47 as a model-limited coverage headline.
+baseline_v1: 13/47 pockets (27.7%) mean_validity=1.000 on covered pockets [metrics_per_condition__runpocket2mol_real47_full.csv]
+fixed_adapter_v2: 43/47 pockets (91.5%) mean_validity=1.000 on covered pockets [metrics_per_condition__runpocket2mol_real47_full_v2.csv]
 
-fixed_adapter_v2: INCOMPLETE — run covered 19/47 pockets only
-  (not a finished 47-pocket panel; earlier "1/1" was a reporting error).
-  Among those 19 pockets on the original tag: 16/19 with n_valid>0
-  (failed originals: 1DIZ, 2AV1, 2X4Q), mean_validity on the 19 = 0.842.
-  source: metrics_per_condition__runpocket2mol_real47_full_v2.csv
-  status: partial re-benchmark with corrected adapter; remaining 28/47
-          pockets not yet run. No corrected full-panel coverage number
-          is available yet — do not invent one.
+Adapter fix recovered 30/34 previously failing pockets (88.2% of the 13/47→47 coverage gap). Remaining 4 pockets still have n_valid=0 on original.

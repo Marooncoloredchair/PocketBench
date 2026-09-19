@@ -29,14 +29,20 @@ export DIFFSBDD_CHECKPOINT="${DIFFSBDD_CHECKPOINT:-/work/pi_nzawia_uri_edu/pocke
 export DIFFSBDD_PYTHON="${DIFFSBDD_PYTHON:-}"
 export POCKET2MOL_REPO="${POCKET2MOL_REPO:-/work/pi_nzawia_uri_edu/pocketbench/Pocket2Mol}"
 export POCKET2MOL_CHECKPOINT="${POCKET2MOL_CHECKPOINT:-/work/pi_nzawia_uri_edu/pocketbench/ckpts/pretrained_Pocket2Mol.pt}"
-# Pocket2Mol often needs a separate older Python env
-export POCKET2MOL_PYTHON="${POCKET2MOL_PYTHON:-}"
+# Dedicated Pocket2Mol env — do NOT point this at the pocketbench interpreter.
+# See cluster/README.md "Conda environments (two, not one)" and cluster/build_p2m_env.sh.
+export POCKET2MOL_PYTHON="${POCKET2MOL_PYTHON:-/work/pi_nzawia_uri_edu/pocketbench/envs/p2m/bin/python}"
 
 # --- SLURM defaults (Unity) ---
-export POCKETBENCH_PARTITION="${POCKETBENCH_PARTITION:-uri-gpu}"
+export POCKETBENCH_PARTITION="${POCKETBENCH_PARTITION:-gpu}"
 export POCKETBENCH_QOS="${POCKETBENCH_QOS:-long}"
 export POCKETBENCH_TIME="${POCKETBENCH_TIME:-7-00:00:00}"
 export POCKETBENCH_GPUS="${POCKETBENCH_GPUS:-1}"
+# Default: any GPU. Pocket2Mol MUST override this — Unity's gpu partition
+# includes Tesla M40 (sm_52 / Maxwell) and CUDA 12 cannot target Maxwell
+# (cudaErrorNoKernelImageForDevice from torch-cluster). Job B sets
+# POCKETBENCH_GRES=gpu:2080_ti:1 (Turing sm_75).
+export POCKETBENCH_GRES="${POCKETBENCH_GRES:-gpu:${POCKETBENCH_GPUS:-1}}"
 export POCKETBENCH_CPUS="${POCKETBENCH_CPUS:-4}"
 export POCKETBENCH_MEM="${POCKETBENCH_MEM:-32G}"
 # EPFL: often also export POCKETBENCH_ACCOUNT=…

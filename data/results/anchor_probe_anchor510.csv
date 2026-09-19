@@ -1,0 +1,9 @@
+pocket_id,anchor_tag,offset_mag_a,pdb_same_as_original,center_orig,center_shifted,bbox_edge,n_atoms_orig,n_atoms_shifted,n_residues_orig,n_residues_shifted,atoms_delta,n_smiles_orig,n_smiles_anchor,smiles_jaccard,smiles_identical_order,verdict
+1AO7,anchor_offset_10,10.0,True,"[59.6875, 9.4934, 19.2854]","[57.7102, 12.8532, 10.0766]",23.0,69,50,18,11,-19,11,11,0.0476,False,PROBE_ACTIVE (bbox atom set changed)
+1AO7,anchor_offset_5,5.0,True,"[59.6875, 9.4934, 19.2854]","[58.6989, 11.1733, 14.681]",23.0,69,67,18,16,-2,11,10,0.05,False,PROBE_ACTIVE (bbox atom set changed)
+1B0R,anchor_offset_10,10.0,True,"[34.4958, 8.0587, 73.7247]","[39.8634, -0.3785, 73.6702]",23.0,86,59,17,12,-27,0,8,0.0,False,PROBE_ACTIVE (bbox atom set changed)
+1B0R,anchor_offset_5,5.0,True,"[34.4958, 8.0587, 73.7247]","[37.1796, 3.8401, 73.6974]",23.0,86,86,17,17,0,0,0,,True,NO_OUTPUT
+1HXC,anchor_offset_10,10.0,True,"[107.9853, 41.014, 45.708]","[108.1426, 31.1112, 47.0903]",23.0,70,38,17,11,-32,10,0,0.0,False,PROBE_ACTIVE (bbox atom set changed)
+1HXC,anchor_offset_5,5.0,True,"[107.9853, 41.014, 45.708]","[108.0639, 36.0626, 46.3992]",23.0,70,66,17,16,-4,10,0,0.0,False,PROBE_ACTIVE (bbox atom set changed)
+1I4F,anchor_offset_10,10.0,True,"[35.3806, -0.0317, 19.0934]","[35.1367, -2.5274, 9.4129]",23.0,53,32,12,9,-21,0,0,,True,NO_OUTPUT
+1I4F,anchor_offset_5,5.0,True,"[35.3806, -0.0317, 19.0934]","[35.2587, -1.2796, 14.2532]",23.0,53,52,12,12,-1,0,0,,True,NO_OUTPUT

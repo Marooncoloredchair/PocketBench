@@ -1,0 +1,83 @@
+project_root: .
+seed: 0
+run_id: pocket2mol_isr_smoke5_anchor510
+paths:
+  results: data/results
+  generations: data/generations
+extraction_radius: 8.0
+skip_failed_pockets: true
+brittleness_std_threshold: 0.05
+invariant_tags:
+- atom_shuffle
+- coordinate_jitter
+- crop_radius_minus_1.5
+pockets:
+- id: 1AO7
+  pdb: data/raw/real50/1ao7.pdb
+  ligand_chain: B
+  ligand_resseq: 100
+  full_pdb: data/raw/real50/1ao7.pdb
+  ref_ligand: B:100
+- id: 1B0R
+  pdb: data/raw/real50/1b0r.pdb
+  ligand_chain: C
+  ligand_resseq: 709
+  full_pdb: data/raw/real50/1b0r.pdb
+  ref_ligand: C:709
+- id: 1DIZ
+  pdb: data/raw/real50/1diz.pdb
+  ligand_chain: C
+  ligand_resseq: 6
+  full_pdb: data/raw/real50/1diz.pdb
+  ref_ligand: C:6
+- id: 1HXC
+  pdb: data/raw/real50/1hxc.pdb
+  ligand_chain: A
+  ligand_resseq: 900
+  full_pdb: data/raw/real50/1hxc.pdb
+  ref_ligand: A:900
+- id: 1I4F
+  pdb: data/raw/real50/1i4f.pdb
+  ligand_chain: A
+  ligand_resseq: 502
+  full_pdb: data/raw/real50/1i4f.pdb
+  ref_ligand: A:502
+perturbations:
+- tag: original
+  type: identity
+- tag: atom_shuffle
+  type: atom_shuffle
+  seed: 0
+- tag: coordinate_jitter
+  type: coordinate_jitter
+  sigma: 0.1
+  seed: 1
+- tag: crop_radius_minus_1.5
+  type: crop_radius_minus
+  delta_angstrom: 1.5
+- tag: face_peel_0.25
+  type: face_peel
+  fraction: 0.25
+  axis: pca
+  direction: plus
+- tag: anchor_offset_5
+  type: anchor_offset
+  offset_angstrom: 5.0
+  direction: pca
+- tag: anchor_offset_10
+  type: anchor_offset
+  offset_angstrom: 10.0
+  direction: pca
+model:
+  type: pocket2mol
+  n_samples: 8
+  repo_root: D:/obsfu/Pocket2Mol
+  checkpoint: D:/obsfu/Pocket2Mol/ckpt/pretrained_Pocket2Mol.pt
+  python_exe: D:/Miniforge/envs/sbdd_py311/python.exe
+  script_path: D:/obsfu/sbdd-robust/scripts/pocket2mol_sample_drug_bridge.py
+  sanitize: true
+  extra_args:
+  - --base_config
+  - configs/sample_for_pdb_4gb.yml
+resume: true
+normalized_only: true

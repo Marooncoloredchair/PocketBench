@@ -1,0 +1,90 @@
+# Re-check first 10 pockets that failed original generation in pocket2mol_real47_full.
+project_root: .
+seed: 0
+run_id: pocket2mol_coverage_recheck10
+paths:
+  results: data/results
+  generations: data/generations
+extraction_radius: 8.0
+skip_failed_pockets: true
+brittleness_std_threshold: 0.05
+invariant_tags:
+- atom_shuffle
+- coordinate_jitter
+pockets:
+- id: 1B0R
+  pdb: data/raw/real50/1b0r.pdb
+  ligand_chain: C
+  ligand_resseq: 709
+  full_pdb: data/raw/real50/1b0r.pdb
+  ref_ligand: C:709
+- id: 1DIZ
+  pdb: data/raw/real50/1diz.pdb
+  ligand_chain: C
+  ligand_resseq: 6
+  full_pdb: data/raw/real50/1diz.pdb
+  ref_ligand: C:6
+- id: 1I4F
+  pdb: data/raw/real50/1i4f.pdb
+  ligand_chain: A
+  ligand_resseq: 502
+  full_pdb: data/raw/real50/1i4f.pdb
+  ref_ligand: A:502
+- id: 1JF1
+  pdb: data/raw/real50/1jf1.pdb
+  ligand_chain: A
+  ligand_resseq: 9001
+  full_pdb: data/raw/real50/1jf1.pdb
+  ref_ligand: A:9001
+- id: 1YFW
+  pdb: data/raw/real50/1yfw.pdb
+  ligand_chain: A
+  ligand_resseq: 401
+  full_pdb: data/raw/real50/1yfw.pdb
+  ref_ligand: A:401
+- id: 1YFY
+  pdb: data/raw/real50/1yfy.pdb
+  ligand_chain: A
+  ligand_resseq: 401
+  full_pdb: data/raw/real50/1yfy.pdb
+  ref_ligand: A:401
+- id: 2AV1
+  pdb: data/raw/real50/2av1.pdb
+  ligand_chain: B
+  ligand_resseq: 801
+  full_pdb: data/raw/real50/2av1.pdb
+  ref_ligand: B:801
+- id: 2GJ6
+  pdb: data/raw/real50/2gj6.pdb
+  ligand_chain: C
+  ligand_resseq: 10
+  full_pdb: data/raw/real50/2gj6.pdb
+  ref_ligand: C:10
+- id: 2P5E
+  pdb: data/raw/real50/2p5e.pdb
+  ligand_chain: E
+  ligand_resseq: 806
+  full_pdb: data/raw/real50/2p5e.pdb
+  ref_ligand: E:806
+- id: 2P5W
+  pdb: data/raw/real50/2p5w.pdb
+  ligand_chain: E
+  ligand_resseq: 901
+  full_pdb: data/raw/real50/2p5w.pdb
+  ref_ligand: E:901
+perturbations:
+- tag: original
+  type: identity
+model:
+  type: pocket2mol
+  n_samples: 8
+  repo_root: D:/obsfu/Pocket2Mol
+  checkpoint: D:/obsfu/Pocket2Mol/ckpt/pretrained_Pocket2Mol.pt
+  python_exe: D:/Miniforge/envs/sbdd_py311/python.exe
+  script_path: D:/obsfu/sbdd-robust/scripts/pocket2mol_sample_drug_bridge.py
+  sanitize: true
+  extra_args:
+  - --base_config
+  - configs/sample_for_pdb_4gb.yml
+resume: true
+normalized_only: false

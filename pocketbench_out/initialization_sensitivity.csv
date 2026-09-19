@@ -1,0 +1,2 @@
+dataset,model,metric,ISR,ISR_ci95_lo,ISR_ci95_hi,frame_median_abs_delta,featurization_median_abs_delta,n_frame_pairs,n_featurization_pairs,frame_tags,featurization_tags
+metrics_per_condition__runtargetdiff_isr_smoke5,all,mean_qed,9.83,0.752,14.245,0.0484,0.00492,7,8,"crop_radius_minus_1.5,face_peel_0.25","atom_shuffle,coordinate_jitter"

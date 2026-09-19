@@ -1,0 +1,10 @@
+pocket_id,perturbation_tag,pocket_atoms,n_ghost_atoms,bbox_angstrom,aggressive_in_bbox,selective_in_bbox,unmasked_in_bbox,note
+1AO7,crop_radius_minus_1.5,37,32,23.0,37,378,410,aggressive masking leaves only pocket tensor atoms
+1AO7,face_peel_0.25,53,16,23.0,53,394,410,
+1B0R,crop_radius_minus_1.5,52,34,23.0,52,436,470,
+1B0R,face_peel_0.25,66,20,23.0,66,450,470,
+1HXC,crop_radius_minus_1.5,29,41,23.0,29,500,541,
+1HXC,face_peel_0.25,55,15,23.0,55,526,541,
+1I4F,crop_radius_minus_1.5,15,38,23.0,15,307,345,
+1I4F,face_peel_0.25,43,10,23.0,43,335,345,
+# probe (selective vs aggressive P2M mols on 1AO7 crop): sel=6 aggr=0

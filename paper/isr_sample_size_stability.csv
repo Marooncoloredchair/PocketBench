@@ -1,0 +1,4 @@
+dataset,model,metric,ISR,ISR_ci95_lo,ISR_ci95_hi,frame_median_abs_delta,featurization_median_abs_delta,n_frame_pairs,n_featurization_pairs,frame_tags,featurization_tags,analysis
+colab47_full_crop,diffsbdd,mean_qed,1.978,1.415,2.54,0.05786,0.02926,47,94,crop_radius_minus_1.5,"atom_shuffle,coordinate_jitter",colab47_full_crop
+colab47_matched4_slice_crop,diffsbdd,mean_qed,2.337,1.562,3.69,0.06862,0.02937,4,8,crop_radius_minus_1.5,"atom_shuffle,coordinate_jitter",colab47_matched4_slice_crop
+matched4_v2_crop+peel,diffsbdd,mean_qed,0.867,0.27,5.91,0.04275,0.04933,8,8,"crop_radius_minus_1.5,face_peel_0.25","atom_shuffle,coordinate_jitter",matched4_v2_crop+peel

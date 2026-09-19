@@ -1,0 +1,9 @@
+dataset,tau,metrics,n_brittle,total,brittleness_rate
+real47,0.05,"validity,uniqueness,mean_qed,std_qed",10,47,0.2128
+real47,0.1,"validity,uniqueness,mean_qed,std_qed",0,47,0.0
+real47,0.15,"validity,uniqueness,mean_qed,std_qed",0,47,0.0
+real47,0.2,"validity,uniqueness,mean_qed,std_qed",0,47,0.0
+real100,0.05,"validity,uniqueness,mean_qed,std_qed",35,99,0.3535
+real100,0.1,"validity,uniqueness,mean_qed,std_qed",3,99,0.0303
+real100,0.15,"validity,uniqueness,mean_qed,std_qed",0,99,0.0
+real100,0.2,"validity,uniqueness,mean_qed,std_qed",0,99,0.0

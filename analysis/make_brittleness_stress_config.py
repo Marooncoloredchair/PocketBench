@@ -64,6 +64,30 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Build a brittleness-stress sweep config from a base config.")
     ap.add_argument("--base-config", required=True, type=str)
     ap.add_argument("--out", required=True, type=str)
+    ap.add_argument(
+        "--minimal",
+        action="store_true",
+        help="Use a tiny ISR panel: one crop (1.5 A), one face_peel (0.25), one anchor (2.0 A). "
+        "Pair with --max-pockets 3-5 for a quick mechanism sniff test.",
+    )
+    ap.add_argument(
+        "--max-pockets",
+        type=int,
+        default=None,
+        help="Keep only the first N pockets from the base config (after --pocket-ids filtering).",
+    )
+    ap.add_argument(
+        "--pocket-ids",
+        nargs="+",
+        default=None,
+        help="Keep only these pocket IDs (case-insensitive), in the order given.",
+    )
+    ap.add_argument(
+        "--n-samples",
+        type=int,
+        default=None,
+        help="Override model.n_samples (lower = faster smoke runs).",
+    )
     ap.add_argument("--crop-deltas", nargs="+", type=float, default=[0.5, 1.0, 1.5, 2.0, 2.5])
     ap.add_argument("--peel-fractions", nargs="+", type=float, default=[0.15, 0.25, 0.35])
     ap.add_argument("--anchor-offsets", nargs="+", type=float, default=[1.0, 2.0, 3.0])
@@ -77,18 +101,48 @@ def main() -> None:
         base_path = (_ROOT / base_path).resolve()
     cfg = OmegaConf.load(base_path)
 
+    if args.pocket_ids:
+        wanted = {str(x).strip().upper() for x in args.pocket_ids}
+        order = {str(x).strip().upper(): i for i, x in enumerate(args.pocket_ids)}
+        pockets = [p for p in list(cfg.pockets) if str(p.get("id", "")).upper() in wanted]
+        pockets.sort(key=lambda p: order[str(p.get("id", "")).upper()])
+        missing = sorted(wanted - {str(p.get("id", "")).upper() for p in pockets})
+        if missing:
+            raise SystemExit(f"pocket IDs not found in {base_path}: {', '.join(missing)}")
+        cfg.pockets = pockets
+    if args.max_pockets is not None:
+        if args.max_pockets < 1:
+            raise SystemExit("--max-pockets must be >= 1")
+        cfg.pockets = list(cfg.pockets)[: args.max_pockets]
+
+    crop_deltas = [1.5] if args.minimal else list(args.crop_deltas)
+    peel_fractions = [0.25] if args.minimal else list(args.peel_fractions)
+    anchor_offsets = [2.0] if args.minimal else list(args.anchor_offsets)
+
     model_type = str(cfg.get("model", {}).get("type", "")).lower()
     include_anchor = (model_type == "pocket2mol" or args.force_anchor) and not args.no_anchor
 
     base_run = str(cfg.get("run_id", base_path.stem))
-    run_id = args.run_id or f"{base_run}_stress"
+    if args.run_id:
+        run_id = args.run_id
+    elif args.minimal and args.max_pockets:
+        run_id = f"{base_run}_isr_smoke{args.max_pockets}"
+    elif args.minimal:
+        run_id = f"{base_run}_isr_smoke"
+    else:
+        run_id = f"{base_run}_stress"
     cfg.run_id = run_id
     cfg.resume = True
     cfg.normalized_only = True
+    if args.minimal:
+        cfg.skip_failed_pockets = True
+    if args.n_samples is not None:
+        cfg.setdefault("model", {})
+        cfg.model.n_samples = int(args.n_samples)
 
-    crop = sorted({round(float(d), 3) for d in args.crop_deltas})
-    peel = sorted({round(float(f), 3) for f in args.peel_fractions})
-    anchor = sorted({round(float(a), 3) for a in args.anchor_offsets})
+    crop = sorted({round(float(d), 3) for d in crop_deltas})
+    peel = sorted({round(float(f), 3) for f in peel_fractions})
+    anchor = sorted({round(float(a), 3) for a in anchor_offsets})
     specs = build_perturbations(crop, peel, anchor, include_anchor)
     cfg.perturbations = specs
     # invariant_tags keep the legacy brittleness aggregate comparable across runs.

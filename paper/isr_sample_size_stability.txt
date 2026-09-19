@@ -1,0 +1,27 @@
+ISR sample-size stability (DiffSBDD, mean QED)
+
+Large-N reference (47-pocket Colab, crop only):
+  ISR = 1.978 [1.415, 2.54]  (n=47 pockets)
+
+Matched4 slice from same 47-pocket export (crop only, same 4 pockets):
+  ISR = 2.337 [1.562, 3.69]
+
+Matched4 local v2 (crop + face_peel, n=4):
+  ISR = 0.867 [0.27, 5.91]
+
+99-pocket face_peel: NOT in archived CSVs. Produce via:
+  configs/diffsbdd_real100_stress.yaml  (run_id diffsbdd_real100_stress, ~100 pockets × 7 tags)
+  or a Colab rerun of real100 with face_peel_0.25 added to perturbations.
+
+Subsample instability (random n-pocket draws from 47-panel, crop ISR):
+  n= 4: median ISR=1.887  95% [0.513, 5.075]  IQR=1.183
+  n=10: median ISR=1.987  95% [0.935, 3.281]  IQR=0.772
+  n=20: median ISR=1.985  95% [1.285, 2.827]  IQR=0.546
+
+Interpretation sketch:
+  At n=47 crop-only, ISR is stable (~2.0) with a tight CI.
+  At n=4, bootstrap over random 4-pocket subsets spans roughly an order of magnitude
+  (see subsample 95% interval above) — matched4 point estimates are not comparable to large-N.
+  face_peel adds another tag group; 99-pocket face_peel ISR requires diffsbdd_real100_stress run.
+
+Reference rows: D:\obsfu\sbdd-robust\paper\isr_sample_size_stability.csv

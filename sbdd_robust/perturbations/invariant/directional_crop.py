@@ -108,6 +108,10 @@ def face_peel(
     if keep_idx.size == 0:
         raise ValueError("face_peel removed all atoms; lower fraction")
 
+    removed_residue_keys = sorted(
+        {f"{str(c).strip()}:{int(rn)}" for c, rn in to_remove}
+    )
+
     p = pocket.copy()
     p.coords = pocket.coords[keep_idx]
     p.elements = pocket.elements[keep_idx]
@@ -131,4 +135,5 @@ def face_peel(
     p.metadata["face_peel_direction"] = direction
     p.metadata["face_peel_residues_removed"] = int(n_remove)
     p.metadata["face_peel_residues_kept"] = int(n_res - n_remove)
+    p.metadata["face_peel_removed_residue_keys"] = removed_residue_keys
     return p

@@ -1,0 +1,11 @@
+pocket_id,perturbation_type,perturbation_tag,model_name,run_id,n_total,n_valid,validity,n_unique_valid,uniqueness,mean_qed,std_qed,mean_sa,std_sa,brittle_invariant,brittleness_note
+1B0R,original,original,pocket2mol,pocket2mol_coverage_recheck10,8,8,1.0,8,1.0,0.693082652316915,0.1350713144575397,2.75009420288082,1.4133867168013856,False,insufficient_invariant_rows
+1DIZ,original,original,pocket2mol,pocket2mol_coverage_recheck10,0,0,0.0,0,0.0,,,,,False,insufficient_invariant_rows
+1I4F,original,original,pocket2mol,pocket2mol_coverage_recheck10,9,9,1.0,9,1.0,0.5798001268874227,0.1402777318425716,1.8252530452118592,0.359552724286347,False,insufficient_invariant_rows
+1JF1,original,original,pocket2mol,pocket2mol_coverage_recheck10,10,10,1.0,10,1.0,0.6073333786967828,0.0956921200945619,1.991583111650185,0.8442221802025033,False,insufficient_invariant_rows
+1YFW,original,original,pocket2mol,pocket2mol_coverage_recheck10,8,8,1.0,8,1.0,0.540474847784636,0.1452070057171212,2.7693989228971923,0.98327386310743,False,insufficient_invariant_rows
+1YFY,original,original,pocket2mol,pocket2mol_coverage_recheck10,8,8,1.0,8,1.0,0.4041560745377514,0.1022068420426416,3.1917923035302063,0.6345157903790452,False,insufficient_invariant_rows
+2AV1,original,original,pocket2mol,pocket2mol_coverage_recheck10,0,0,0.0,0,0.0,,,,,False,insufficient_invariant_rows
+2GJ6,original,original,pocket2mol,pocket2mol_coverage_recheck10,8,8,1.0,8,1.0,0.5593023906958796,0.157631764079667,3.671630468248194,0.3961646886206315,False,insufficient_invariant_rows
+2P5E,original,original,pocket2mol,pocket2mol_coverage_recheck10,12,12,1.0,12,1.0,0.618750958781059,0.0925705200876031,1.9545125864255488,0.6216728871034571,False,insufficient_invariant_rows
+2P5W,original,original,pocket2mol,pocket2mol_coverage_recheck10,10,10,1.0,10,1.0,0.5629793727486802,0.0843457824089181,1.9686702674062235,0.5054145714741807,False,insufficient_invariant_rows

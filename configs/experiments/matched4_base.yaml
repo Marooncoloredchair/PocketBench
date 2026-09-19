@@ -1,0 +1,45 @@
+# Shared 4-pocket panel base for matched ISR (skip 1DIZ — face_peel too small).
+project_root: .
+seed: 0
+run_id: matched4_base
+paths:
+  results: data/results
+  generations: data/generations
+extraction_radius: 8.0
+skip_failed_pockets: true
+brittleness_std_threshold: 0.05
+invariant_tags:
+- atom_shuffle
+- coordinate_jitter
+- crop_radius_minus_1.5
+pockets:
+- id: 1AO7
+  pdb: data/raw/real50/1ao7.pdb
+  ligand_chain: B
+  ligand_resseq: 100
+  full_pdb: data/raw/real50/1ao7.pdb
+  ref_ligand: B:100
+- id: 1B0R
+  pdb: data/raw/real50/1b0r.pdb
+  ligand_chain: C
+  ligand_resseq: 709
+  full_pdb: data/raw/real50/1b0r.pdb
+  ref_ligand: C:709
+- id: 1HXC
+  pdb: data/raw/real50/1hxc.pdb
+  ligand_chain: A
+  ligand_resseq: 900
+  full_pdb: data/raw/real50/1hxc.pdb
+  ref_ligand: A:900
+- id: 1I4F
+  pdb: data/raw/real50/1i4f.pdb
+  ligand_chain: A
+  ligand_resseq: 502
+  full_pdb: data/raw/real50/1i4f.pdb
+  ref_ligand: A:502
+perturbations:
+- tag: original
+  type: identity
+model:
+  type: mock
+  n_samples: 1

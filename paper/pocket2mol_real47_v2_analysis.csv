@@ -1,0 +1,10 @@
+analysis,label,n_pockets,n_generating,coverage_fraction,mean_validity_covered,baseline_generating,fixed_generating,baseline_coverage_fraction,fixed_coverage_fraction,pockets_recovered_by_fix,fraction_of_coverage_gap_closed,remaining_zero_valid_original,dataset,tau,metrics,n_brittle,total,brittleness_rate,metric,comparison,n_pairs,n_zero_diff,mean_delta,median_delta,wilcoxon_W,p_value,rank_biserial_r,z,effect_size_r_z,median_ci95_lo,median_ci95_hi,mean_ci95_lo,mean_ci95_hi
+coverage,fixed_adapter_v2,47.0,43.0,0.9149,1.0,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+coverage,baseline_v1_adapter_bug,47.0,13.0,0.2766,1.0,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+coverage_comparison,adapter_fix_attribution,,,,,13.0,43.0,0.2766,0.9149,30.0,0.8824,4.0,,,,,,,,,,,,,,,,,,,,,
+normalized_brittleness,,,,,,,,,,,,,pocket2mol_real47_v2,0.05,"validity,uniqueness,mean_qed,std_qed",31.0,47.0,0.6596,,,,,,,,,,,,,,,
+normalized_brittleness,,,,,,,,,,,,,pocket2mol_real47_v2,0.1,"validity,uniqueness,mean_qed,std_qed",13.0,47.0,0.2766,,,,,,,,,,,,,,,
+normalized_brittleness,,,,,,,,,,,,,pocket2mol_real47_v2,0.15,"validity,uniqueness,mean_qed,std_qed",5.0,47.0,0.1064,,,,,,,,,,,,,,,
+normalized_brittleness,,,,,,,,,,,,,pocket2mol_real47_v2,0.2,"validity,uniqueness,mean_qed,std_qed",4.0,47.0,0.0851,,,,,,,,,,,,,,,
+crop_radius_wilcoxon,,,,,,,,,,,,,pocket2mol_real47_v2,,,,,,dQED,crop_radius_minus_1.5 vs original,43.0,0.0,0.0092,-0.0056,449.0,0.7787960584423672,0.0507,0.2898,0.0442,-0.0436,0.0461,-0.0218,0.0403
+crop_radius_wilcoxon,,,,,,,,,,,,,pocket2mol_real47_v2,,,,,,dSA,crop_radius_minus_1.5 vs original,43.0,0.0,-0.4365,-0.4605,175.0,0.0001828081337862386,-0.63,-3.5983,0.5487,-0.7221,-0.2823,-0.6392,-0.2229

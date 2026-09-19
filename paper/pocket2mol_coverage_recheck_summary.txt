@@ -1,0 +1,5 @@
+Pocket2Mol coverage recheck (10 pockets that failed in real47 original runs).
+With the fixed full-PDB + ligand-centered adapter, 8/10 (80%) now produce valid molecules.
+Still zero valid mols: 2/10 — likely true model/pocket difficulty, not input format.
+Original baseline: 13/47 pockets generated (34 failed). This sample implies ~80% of those failures were harness/input-format artifacts (~27 of 34 pockets, extrapolated), with ~7 remaining hard failures.
+Baseline: metrics_per_condition__runpocket2mol_real47_full.csv; recheck: metrics_per_condition__runpocket2mol_coverage_recheck10.csv.

@@ -175,8 +175,29 @@ class DiffSBDDAdapter(BaseSBDDAdapter):
 
                 _wd = Path(__file__).resolve().parent
                 _REPO = {json.dumps(str(self.repo_root))}
-                if _REPO not in sys.path:
-                    sys.path.insert(0, _REPO)
+                # PocketBench ships a top-level analysis/ that shadows DiffSBDD's
+                # analysis.visualization when the bench repo is on PYTHONPATH.
+                _repo_n = str(Path(_REPO).resolve())
+                def _keep(p):
+                    try:
+                        pr = Path.cwd().resolve() if (not p or p == ".") else Path(p).resolve()
+                    except Exception:
+                        return True
+                    if str(pr) == _repo_n:
+                        return True
+                    # Drop any path that exposes a non-DiffSBDD analysis package.
+                    if (pr / "analysis" / "__init__.py").is_file() and not (
+                        pr / "analysis" / "visualization.py"
+                    ).is_file():
+                        return False
+                    return True
+                sys.path[:] = [p for p in sys.path if _keep(p)]
+                while _REPO in sys.path:
+                    sys.path.remove(_REPO)
+                sys.path.insert(0, _REPO)
+                for _k in list(sys.modules):
+                    if _k == "analysis" or _k.startswith("analysis."):
+                        del sys.modules[_k]
                 sys.argv = json.loads((_wd / "_sbdd_robust_diffsbdd_argv.json").read_text(encoding="utf-8"))
                 runpy.run_path({json.dumps(str(gl_path))}, run_name="__main__")
                 """
@@ -188,10 +209,12 @@ class DiffSBDDAdapter(BaseSBDDAdapter):
         cmd: List[str] = [self.python_exe, str(launcher)]
 
         env = os.environ.copy()
-        env["PYTHONPATH"] = str(self.repo_root) + os.pathsep + env.get("PYTHONPATH", "")
+        # DiffSBDD only — do not inherit PocketBench PYTHONPATH (analysis/ clash).
+        # Also avoid cwd=PocketBench: empty sys.path entry would shadow DiffSBDD.
+        env["PYTHONPATH"] = str(self.repo_root.resolve())
         proc = subprocess.run(
             cmd,
-            cwd=str(self.repo_root),
+            cwd=str(self.repo_root.resolve()),
             env=env,
             capture_output=True,
             text=True,

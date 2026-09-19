@@ -1,0 +1,74 @@
+project_root: .
+seed: 0
+run_id: targetdiff_isr_smoke5
+paths:
+  results: data/results
+  generations: data/generations
+extraction_radius: 8.0
+skip_failed_pockets: true
+brittleness_std_threshold: 0.05
+invariant_tags:
+- atom_shuffle
+- coordinate_jitter
+- crop_radius_minus_1.5
+pockets:
+- id: 1AO7
+  pdb: data/raw/real50/1ao7.pdb
+  ligand_chain: B
+  ligand_resseq: 100
+  full_pdb: data/raw/real50/1ao7.pdb
+  ref_ligand: B:100
+- id: 1B0R
+  pdb: data/raw/real50/1b0r.pdb
+  ligand_chain: C
+  ligand_resseq: 709
+  full_pdb: data/raw/real50/1b0r.pdb
+  ref_ligand: C:709
+- id: 1DIZ
+  pdb: data/raw/real50/1diz.pdb
+  ligand_chain: C
+  ligand_resseq: 6
+  full_pdb: data/raw/real50/1diz.pdb
+  ref_ligand: C:6
+- id: 1HXC
+  pdb: data/raw/real50/1hxc.pdb
+  ligand_chain: A
+  ligand_resseq: 900
+  full_pdb: data/raw/real50/1hxc.pdb
+  ref_ligand: A:900
+- id: 1I4F
+  pdb: data/raw/real50/1i4f.pdb
+  ligand_chain: A
+  ligand_resseq: 502
+  full_pdb: data/raw/real50/1i4f.pdb
+  ref_ligand: A:502
+perturbations:
+- tag: original
+  type: identity
+- tag: atom_shuffle
+  type: atom_shuffle
+  seed: 0
+- tag: coordinate_jitter
+  type: coordinate_jitter
+  sigma: 0.1
+  seed: 1
+- tag: crop_radius_minus_1.5
+  type: crop_radius_minus
+  delta_angstrom: 1.5
+- tag: face_peel_0.25
+  type: face_peel
+  fraction: 0.25
+  axis: pca
+  direction: plus
+model:
+  type: targetdiff
+  n_samples: 8
+  repo_root: D:/obsfu/targetdiff
+  config_yaml: D:/obsfu/targetdiff/configs/sampling.yml
+  python_exe: D:/Miniforge/envs/pocket2mol/python.exe
+  device: cuda:0
+  batch_size: 8
+  sanitize: true
+  extra_args: []
+resume: true
+normalized_only: true

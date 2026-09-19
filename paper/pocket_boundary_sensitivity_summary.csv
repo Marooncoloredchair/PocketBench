@@ -1,0 +1,3 @@
+dataset,n_pockets,PBSI_median_abs_slope_qed_per_A,median_signed_slope,iqr_abs_slope,frac_shrinking_lowers_qed,median_boundary_range_qed,median_noise_std_qed,median_snr_1.5A,frac_boundary_exceeds_noise
+real47,47,0.018,0.01146,0.01857,0.6809,0.08116,0.0161,1.722,0.7447
+real100,99,0.0226,0.01858,0.02692,0.8182,0.10084,0.01345,2.637,0.7778

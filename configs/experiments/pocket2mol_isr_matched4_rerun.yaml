@@ -1,0 +1,59 @@
+# Re-run Pocket2Mol matched stress on pockets with missing original/frame data.
+# Targets: 1B0R (missing original), 1I4F (all missing). Same 5 conditions as TargetDiff (no anchor).
+project_root: .
+seed: 0
+run_id: pocket2mol_isr_matched4_rerun
+paths:
+  results: data/results
+  generations: data/generations
+extraction_radius: 8.0
+skip_failed_pockets: true
+brittleness_std_threshold: 0.05
+invariant_tags:
+- atom_shuffle
+- coordinate_jitter
+- crop_radius_minus_1.5
+pockets:
+- id: 1B0R
+  pdb: data/raw/real50/1b0r.pdb
+  ligand_chain: C
+  ligand_resseq: 709
+  full_pdb: data/raw/real50/1b0r.pdb
+  ref_ligand: C:709
+- id: 1I4F
+  pdb: data/raw/real50/1i4f.pdb
+  ligand_chain: A
+  ligand_resseq: 502
+  full_pdb: data/raw/real50/1i4f.pdb
+  ref_ligand: A:502
+perturbations:
+- tag: original
+  type: identity
+- tag: atom_shuffle
+  type: atom_shuffle
+  seed: 0
+- tag: coordinate_jitter
+  type: coordinate_jitter
+  sigma: 0.1
+  seed: 1
+- tag: crop_radius_minus_1.5
+  type: crop_radius_minus
+  delta_angstrom: 1.5
+- tag: face_peel_0.25
+  type: face_peel
+  fraction: 0.25
+  axis: pca
+  direction: plus
+model:
+  type: pocket2mol
+  n_samples: 8
+  repo_root: D:/obsfu/Pocket2Mol
+  checkpoint: D:/obsfu/Pocket2Mol/ckpt/pretrained_Pocket2Mol.pt
+  python_exe: D:/Miniforge/envs/sbdd_py311/python.exe
+  script_path: D:/obsfu/sbdd-robust/scripts/pocket2mol_sample_drug_bridge.py
+  sanitize: true
+  extra_args:
+  - --base_config
+  - configs/sample_for_pdb_4gb.yml
+resume: true
+normalized_only: true

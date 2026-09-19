@@ -1,18 +1,46 @@
 # PocketBench
 
-**PocketBench** is an open-source benchmark toolkit for measuring **reliability** of structure-based drug design (SBDD) generative models under **pocket perturbations** that preserve chemistry but change featurization (atom order, coordinate jitter, crop radius). Plug in your model with a small adapter, run on any set of PDB complexes, and get **brittleness rates**, **coverage**, chemistry metrics, and optional **docking** scores—typically in one afternoon once your backend is wired.
+**PocketBench** measures whether structure-based drug design (SBDD) generative models are **reliable** — not just whether they generate good molecules, but whether their outputs survive perturbations to how the binding pocket is defined and featurized. It separates two things benchmarks usually conflate:
 
-> The importable Python package and CLI module are named **`sbdd_robust`** (e.g. `python -m sbdd_robust`); the project/repository is **PocketBench**.
+- **Featurization noise** (atom-order shuffle, sub-ångström coordinate jitter) that *should* leave the answer unchanged, and
+- **Pocket boundary definition** (the crop radius) — an unreported preprocessing choice that, it turns out, silently moves drug-likeness.
 
-The goal: if someone training a new SBDD model can run
+Its headline deliverable is the **Pocket Boundary Sensitivity Index (PBSI)**: a single, comparable number quantifying how much a model's drug-likeness depends on the crop radius, reported *relative to that model's own featurization-noise floor*. In our runs, the crop choice moves QED more than featurization noise does for **~3 of every 4 pockets**.
+
+> The importable package / CLI module is **`sbdd_robust`** (`python -m sbdd_robust` or the `pocketbench` entry point); the project/repository is **PocketBench**.
+
+## Analyze your own model in 30 seconds (no GPU)
+
+You do **not** need to rerun PocketBench's generation to use it. If your model can already sample molecules for a pocket, produce a per-condition metrics CSV (one row per pocket × perturbation) and PocketBench will score it:
 
 ```bash
-python -m sbdd_robust run --config mymodel.yaml
+pip install -e .
+
+# brittleness + paired crop-radius test + PBSI, written to a paper-ready folder
+pocketbench report --metrics my_model_metrics.csv --out-dir my_report
+
+# or individual analyses
+pocketbench pbsi        --metrics my_model_metrics.csv     # Pocket Boundary Sensitivity Index
+pocketbench crop-test   --metrics my_model_metrics.csv     # paired Wilcoxon ΔQED / ΔSA
+pocketbench brittleness --metrics my_model_metrics.csv --raw
 ```
 
-and receive a clear robustness report, they will **use** the tool and **cite** the paper—building a long-term citation habit around reproducible stress testing.
+### Input schema (bring-your-own-model)
 
-## Quick start
+One row per (pocket, perturbation condition):
+
+| column | type | notes |
+|---|---|---|
+| `pocket_id` | str | target identifier |
+| `perturbation_tag` | str | `original`, `atom_shuffle`, `coordinate_jitter`, `crop_radius_plus_<x>`, `crop_radius_minus_<x>` |
+| `model_name` | str | optional; filter with `--model` |
+| `validity`, `uniqueness` | float | in [0,1] |
+| `mean_qed`, `std_qed` | float | RDKit QED over the sampled molecules |
+| `mean_sa`, `std_sa` | float | optional (RDKit SA, ~1–10) |
+
+`pocketbench pbsi` needs `original` plus at least one `crop_radius_*` condition; with the standard ±1.5 Å pair it returns a coarse estimate, and a fine sweep (below) yields the full dose-response.
+
+## Run the full benchmark (with a model backend)
 
 ```bash
 git clone https://github.com/Marooncoloredchair/PocketBench.git
@@ -21,9 +49,31 @@ pip install -e ".[dev]"
 
 # Fast sanity check (mock model, a few pockets)
 python -m sbdd_robust run --config configs/examples/smoke.yaml
+
+# Report normalized brittleness alongside the raw flag automatically
+python -m sbdd_robust run --config mymodel.yaml --normalized-only --resume
+```
+
+### Crop-radius sweep (the dose-response)
+
+Generate a fine sweep config from any base config, then run it (resumable) to chart the full QED-vs-radius curve and per-pocket critical radii:
+
+```bash
+python analysis/make_crop_sweep_config.py \
+  --base-config configs/diffsbdd_real100.yaml \
+  --out configs/diffsbdd_real100_cropsweep.yaml \
+  --deltas 0.5 1.0 1.5 2.0 2.5 3.0
+python -m sbdd_robust run --config configs/diffsbdd_real100_cropsweep.yaml --resume --normalized-only
+pocketbench pbsi --metrics data/results/metrics_per_condition__rundiffsbdd_real100_cropsweep.csv
 ```
 
 See **`configs/examples/`** for `diffsbdd.example.yaml`, `pocket2mol.example.yaml`, and small real panels. See **`sbdd_robust/models/`** to add a new `model.type`.
+
+## Metric definitions
+
+- **Normalized brittleness rate** — fraction of pockets whose std across the four perturbation conditions exceeds threshold τ, on the normalized metric subset (validity, uniqueness, mean/std QED). Reported as the *primary* view; the all-column flag over raw counts/SA is a cautionary secondary (it inflates any [0,1]-tuned τ).
+- **Crop-radius paired test** — within-pocket paired two-sided Wilcoxon signed-rank of (crop − original) for ΔQED and ΔSA, with matched-pairs rank-biserial effect size and bootstrap 95% CIs.
+- **Pocket Boundary Sensitivity Index (PBSI)** — median |slope| of QED vs crop-radius offset (QED/Å), with a per-pocket boundary-to-noise SNR = (|slope|·1.5 Å)/(QED std across featurization-noise conditions). Implemented in `sbdd_robust/report.py`.
 
 ## Reproducing the paper results
 
@@ -59,14 +109,15 @@ Details: **`configs/experiments/README.md`**.
 
 | Path | Role |
 |------|------|
-| `sbdd_robust/` | Importable library + `python -m sbdd_robust` CLI (**the tool**). |
+| `sbdd_robust/` | Importable library + `python -m sbdd_robust` / `pocketbench` CLI (**the tool**). |
+| `sbdd_robust/report.py` | Shared metric library (PBSI, crop test, normalized brittleness) used by the CLI and `analysis/`. |
 | `configs/examples/` | Small configs for new users and CI. |
 | `configs/experiments/` | Full paper configs (47-pocket panel, meaningful runs, …). |
 | `data/raw/` | Input PDBs: `real50/` (47-complex paper invariant panel), `real100/` (expanded 100-pocket panel), `smoke/` (tiny synthetic). |
 | `data/results/` | Frozen paper CSVs and run logs. |
-| `paper/` | Manuscript, figures, LaTeX (`paper/biorxiv_submission/`). |
+| `paper/` | Manuscript, figures, CSV outputs (`pocket_boundary_sensitivity.csv`, `crop_radius_wilcoxon.csv`, `normalized_brittleness.csv`). |
 | `experiments/` | Shell scripts that reproduce paper outputs. |
-| `analysis/` | Plotting and aggregate analysis. |
+| `analysis/` | Thin multi-panel wrappers over `sbdd_robust/report.py` + the crop-sweep config generator. |
 | `tests/` | `pytest` suite |
 
 ## Citation

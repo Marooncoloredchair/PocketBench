@@ -1,0 +1,41 @@
+==============================================================================
+DOES MOLECULAR WEIGHT EXPLAIN THE QED/SA DISSOCIATION?
+==============================================================================
+
+PANEL CAVEAT: the two panels are disjoint (0 shared pockets). DiffSBDD's
+real47 molecules were never archived off Colab, so no pocket-paired
+cross-model test is possible. Model effect and pocket-set effect are NOT
+separable here. Perturbation protocol is identical across panels.
+
+model       panel         metric    n     median           p    r_rb
+pocket2mol  real47        dMW      43   -23.0351    0.000316  -0.609
+pocket2mol  real47        dQED     43    -0.0056       0.779   0.051
+pocket2mol  real47        dSA      43    -0.4605    0.000183  -0.630
+diffsbdd    real100_vina  dMW      99     8.9518      0.0111   0.294
+diffsbdd    real100_vina  dQED     99    -0.0537    1.25e-10  -0.745
+diffsbdd    real100_vina  dSA      99     0.1094      0.0144   0.283
+
+Boundary-contraction MW direction:
+  pocket2mol  n=43  median dMW =   -23.04 Da  -> LIGHTER   (28% of pockets got heavier)
+  diffsbdd    n=99  median dMW =    +8.95 Da  -> HEAVIER   (58% of pockets got heavier)
+
+------------------------------------------------------------------------------
+ANSWER: OPPOSITE DIRECTIONS. Pocket2Mol makes molecules LIGHTER and
+DiffSBDD makes them HEAVIER under identical pocket contraction, both
+significant. This is consistent with genuinely distinct mechanistic
+responses rather than one shared mass shift scored two ways -- BUT it
+is confounded with pocket set (disjoint panels), so it cannot yet be
+attributed to architecture. The paper must state that confound.
+------------------------------------------------------------------------------
+
+MW -> metric coupling at the boundary condition:
+  pocket2mol  dMW->dQED  n=43  pearson=+0.331 (p=0.0301)  spearman=+0.372 (p=0.0141)  OLS slope=+6.666e-04/Da  R2=0.110
+  pocket2mol  dMW->dSA   n=43  pearson=+0.153 (p=0.326)  spearman=+0.232 (p=0.134)  OLS slope=+2.100e-03/Da  R2=0.024
+  diffsbdd    dMW->dQED  n=99  pearson=-0.559 (p=1.74e-09)  spearman=-0.424 (p=1.22e-05)  OLS slope=-4.200e-04/Da  R2=0.313
+  diffsbdd    dMW->dSA   n=99  pearson=+0.851 (p=6.38e-29)  spearman=+0.849 (p=1.12e-28)  OLS slope=+6.089e-03/Da  R2=0.725
+
+Featurization control (MW should not move if the effect is boundary-specific):
+  pocket2mol  atom_shuffle         n=43  median dMW=   +0.00 Da  p=0.499
+  pocket2mol  coordinate_jitter    n=43  median dMW=   -3.39 Da  p=0.227
+  diffsbdd    atom_shuffle         n=99  median dMW=   -1.87 Da  p=0.537
+  diffsbdd    coordinate_jitter    n=99  median dMW=   -4.51 Da  p=0.0932

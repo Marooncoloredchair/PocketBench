@@ -1,0 +1,4 @@
+component,comparison,n_pairs,n_zero_diff,mean_delta,median_delta,wilcoxon_W,p_value,rank_biserial_r,z,effect_size_r_z,median_ci95_lo,median_ci95_hi
+total,crop_radius_minus_1.5 mols/rec vs original mols/rec,99,0,0.3581,0.234,1432.0,0.0002722441707162997,0.4214,3.6404,0.3659,0.0766,0.4615
+receptor_effect,"original_mols_cropped_receptor − original (same mols, cropped rec)",99,0,0.2754,0.2989,1672.0,0.005067636145567437,0.3244,2.8027,0.2817,-0.0068,0.4295
+molecule_effect,crop mols on crop rec − orig mols on crop rec,99,0,0.0827,0.054,1314.0,5.0732528755070064e-05,0.4691,4.0522,0.4073,0.0175,0.1033

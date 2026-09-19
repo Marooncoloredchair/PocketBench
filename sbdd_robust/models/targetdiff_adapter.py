@@ -8,11 +8,47 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
+import numpy as np
+import torch
 from rdkit import Chem
 
 from sbdd_robust.datasets.pdb_io import write_pocket_pdb
 from sbdd_robust.datasets.pocket import Pocket
 from sbdd_robust.models.base_adapter import BaseSBDDAdapter
+from sbdd_robust.models.pocket2mol_adapter import mol_from_atom_arrays
+
+
+def _mols_from_sample_pt(
+    pt_path: Path,
+    repo_root: Path,
+    *,
+    sanitize: bool,
+    ligand_atom_mode: str = "add_aromatic",
+) -> list[Chem.Mol]:
+    """Rebuild RDKit mols from TargetDiff ``sample.pt`` when upstream SDF export is empty."""
+    repo = str(repo_root.resolve())
+    if repo not in sys.path:
+        sys.path.insert(0, repo)
+    from utils import transforms as trans  # type: ignore[import-untyped]
+
+    payload = torch.load(str(pt_path), map_location="cpu", weights_only=False)
+    mols: list[Chem.Mol] = []
+    for pred_pos, pred_v in zip(payload["pred_ligand_pos"], payload["pred_ligand_v"]):
+        pos = np.asarray(pred_pos, dtype=np.float64)
+        v_arr = pred_v.detach().cpu().numpy() if hasattr(pred_v, "detach") else np.asarray(pred_v)
+        z = np.array(trans.get_atomic_number_from_index(v_arr, mode=ligand_atom_mode), dtype=np.int64)
+        mol = mol_from_atom_arrays(z, pos)
+        if mol is None:
+            continue
+        if sanitize:
+            try:
+                smi = Chem.MolToSmiles(mol)
+                if "." in smi:
+                    continue
+            except Exception:
+                continue
+        mols.append(mol)
+    return mols
 
 
 class TargetDiffAdapter(BaseSBDDAdapter):
@@ -86,6 +122,8 @@ class TargetDiffAdapter(BaseSBDDAdapter):
             env["PYTHONPATH"] = pp + os.pathsep + env["PYTHONPATH"]
         else:
             env["PYTHONPATH"] = pp
+        # pocket2mol env uses torch ~1.13; inherited expandable_segments breaks CUDA init.
+        env.pop("PYTORCH_CUDA_ALLOC_CONF", None)
 
         subprocess.run(
             cmd,
@@ -95,6 +133,8 @@ class TargetDiffAdapter(BaseSBDDAdapter):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
 
         mols: list[Chem.Mol] = []
@@ -114,8 +154,11 @@ class TargetDiffAdapter(BaseSBDDAdapter):
 
         pt_path = result_path / "sample.pt"
         if not mols and pt_path.is_file():
-            # Optional: user may extend to torch-load coordinates; leave empty list.
-            pass
+            mols = _mols_from_sample_pt(
+                pt_path,
+                self.repo_root,
+                sanitize=self.sanitize,
+            )
 
         return mols[: int(n_samples)]
 

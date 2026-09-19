@@ -28,7 +28,21 @@ Use PI work storage (not `/work/$USER`):
 
 GPU partition: `uri-gpu`, long QoS: `-q long`. See also `D:\BNDF\scripts\unity\`.
 
+## After Job A (Vina panel)
+
+Decompose crop ΔVina into receptor vs molecule effects:
+
+```bash
+python analysis/vina_receptor_control.py \
+  --config configs/cluster/diffsbdd_real100_vina.yaml \
+  --metrics-csv "$POCKETBENCH_RESULTS/metrics_per_condition__rundiffsbdd_real100_vina.csv" \
+  --generations-root "$POCKETBENCH_GENERATIONS/run_diffsbdd_real100_vina"
+```
+
+See script docstring for the `original_mols_cropped_receptor` control.
+
 ## Resume from a partial panel CSV (Job B)
+
 
 If a non-array run already wrote `metrics_per_condition__run{ID}.csv` for some
 pockets, seed shard files before submitting so `--resume` skips them:
@@ -39,6 +53,59 @@ python cluster/seed_array_shards_from_panel.py \
   --config configs/cluster/pocket2mol_real47_v2_resume.yaml \
   --results-dir "$POCKETBENCH_RESULTS" \
   --run-id pocket2mol_real47_full_v2
+```
+
+## Conda environments (two, not one)
+
+Pocket2Mol pins a 2022 stack (`env_cuda113.yml`: python 3.8, torch 1.10, PyG
+2.0.4) that cannot coexist with the DiffSBDD/Vina stack. Job B failed once
+because it reused the `pocketbench` env, which has no `easydict`. Keep them
+separate:
+
+| Env | Path | Used by | Entered how |
+| --- | --- | --- | --- |
+| `pocketbench` | `/work/pi_nzawia_uri_edu/pocketbench/envs/pocketbench` | PocketBench CLI, DiffSBDD, Vina/Meeko, all metrics | `conda activate` in the SLURM script |
+| `p2m` | `/work/pi_nzawia_uri_edu/pocketbench/envs/p2m` | Pocket2Mol sampling **only** | never activated; invoked as `POCKET2MOL_PYTHON` by the adapter subprocess |
+
+The Pocket2Mol adapter shells out to `POCKET2MOL_PYTHON`, so the two stacks
+never share an interpreter. Set in `env.local.sh`:
+
+```bash
+export POCKET2MOL_PYTHON=/work/pi_nzawia_uri_edu/pocketbench/envs/p2m/bin/python
+export POCKET2MOL_REPO=/work/pi_nzawia_uri_edu/pocketbench/Pocket2Mol
+export POCKET2MOL_CHECKPOINT=/work/pi_nzawia_uri_edu/pocketbench/ckpts/pretrained_Pocket2Mol.pt
+```
+
+### Rebuilding the `p2m` env
+
+`cluster/build_p2m_env.sh` is the reproducible recipe. The non-obvious pins,
+each found by an actual import/run failure:
+
+- **`torch-geometric==2.4.0`** — PyG >= 2.5 renamed `torch_geometric.utils.subgraph`
+  to a private `_subgraph` module, which breaks `utils/transforms.py`. 2.4.0 is
+  the newest version whose import surface Pocket2Mol still matches.
+- **`torch-cluster`** — `utils/transforms.py` calls `knn_graph`, which PyG only
+  dispatches when `torch-cluster` is installed. Compile with
+  `--no-build-isolation` (torch must already be importable) or the build fails
+  with `No module named 'torch'`. Include `6.1` in `TORCH_CUDA_ARCH_LIST`:
+  Unity's `gpu` partition has GTX 1080 Ti (sm_61). A wheel built only for
+  7.0+ raises `cudaErrorNoKernelImageForDevice`.
+- **`numpy<2`** — the 2022-era code paths use APIs removed in NumPy 2.
+- **`easydict`** — the dependency that broke the first Job B submission.
+
+`torch-scatter` and `torch-cluster` build CUDA kernels from source. Compile
+them **on a GPU node** (`srun --partition=gpu … bash cluster/build_p2m_env.sh`),
+or kernels built on the login node will raise `cudaErrorNoKernelImageForDevice`
+on gypsum. `torch-sparse` is not required by Pocket2Mol's sample path and
+failed to compile here — leave it out.
+
+Verify before submitting an array — never submit 28 tasks on an unverified env.
+The Unity `gpu` partition includes Tesla M40 (sm_52). CUDA 12 cannot target
+Maxwell, so the smoke and Job B request `--gres=gpu:2080_ti:1` (Turing sm_75).
+Do not use bare `gpu:1` for Pocket2Mol.
+
+```bash
+bash cluster/_unity_p2m_smoke.sh   # 1 pocket, 4 samples, own run_id, asserts mols > 0
 ```
 
 ## Quick start

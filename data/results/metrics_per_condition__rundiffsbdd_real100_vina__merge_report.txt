@@ -1,0 +1,9 @@
+run_id: diffsbdd_real100_vina
+shards_found: 99
+shards_used: 99
+merged_rows: 495
+unique_pockets: 99
+out: /work/pi_nzawia_uri_edu/pocketbench/repo/data/results/metrics_per_condition__rundiffsbdd_real100_vina.csv
+expected_pockets: 100
+WARN: unique_pockets (99) != expected (100)
+missing_shard_indices: [46]

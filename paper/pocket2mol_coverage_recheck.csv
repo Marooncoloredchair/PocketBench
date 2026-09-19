@@ -1,0 +1,12 @@
+pocket_id,baseline_n_valid,baseline_failed,recheck_n_valid,recheck_n_total,recheck_validity,recheck_mean_qed,now_generates,harness_recovered,notes
+1B0R,0,1,8,8,1.0,0.693082652316915,True,True,
+1DIZ,0,1,0,0,0.0,,False,False,
+1I4F,0,1,9,9,1.0,0.5798001268874227,True,True,
+1JF1,0,1,10,10,1.0,0.6073333786967828,True,True,
+1YFW,0,1,8,8,1.0,0.540474847784636,True,True,
+1YFY,0,1,8,8,1.0,0.4041560745377514,True,True,
+2AV1,0,1,0,0,0.0,,False,False,
+2GJ6,0,1,8,8,1.0,0.5593023906958796,True,True,
+2P5E,0,1,12,12,1.0,0.618750958781059,True,True,
+2P5W,0,1,10,10,1.0,0.5629793727486802,True,True,
+__SUMMARY__,13,34,8,10,0.8,,,,8/10 recovered; ~80% of original 34 failures likely input-format related (~27/34 extrapolated)

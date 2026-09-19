@@ -1,0 +1,7 @@
+run_id: pocket2mol_real47_full_v2
+shards_found: 47
+shards_used: 47
+merged_rows: 235
+unique_pockets: 47
+out: data/results/metrics_per_condition__runpocket2mol_real47_full_v2.csv
+expected_pockets: 47

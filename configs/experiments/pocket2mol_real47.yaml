@@ -19,7 +19,7 @@
 #
 project_root: .
 seed: 0
-run_id: pocket2mol_real47_full
+run_id: pocket2mol_real47_full_v2
 paths:
   results: data/results
   generations: data/generations
@@ -342,3 +342,4 @@ model:
   extra_args:
     - --base_config
     - configs/sample_for_pdb_4gb.yml
+resume: true

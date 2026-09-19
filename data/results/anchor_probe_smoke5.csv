@@ -1,0 +1,5 @@
+pocket_id,anchor_tag,offset_mag_a,pdb_same_as_original,center_orig,center_shifted,bbox_edge,n_atoms_orig,n_atoms_shifted,n_residues_orig,n_residues_shifted,atoms_delta,n_smiles_orig,n_smiles_anchor,smiles_jaccard,smiles_identical_order,verdict
+1AO7,anchor_offset_2,2.0,True,"[59.6875, 9.4934, 19.2854]","[59.2921, 10.1654, 17.4436]",23.0,69,69,18,18,0,11,11,1.0,True,"PROBE_INERT (same bbox atoms, identical SMILES)"
+1B0R,anchor_offset_2,2.0,True,"[34.4958, 8.0587, 73.7247]","[35.5693, 6.3713, 73.7138]",23.0,86,86,17,17,0,0,0,,True,NO_OUTPUT
+1HXC,anchor_offset_2,2.0,True,"[107.9853, 41.014, 45.708]","[108.0167, 39.0334, 45.9845]",23.0,70,70,17,17,0,10,10,1.0,True,"PROBE_INERT (same bbox atoms, identical SMILES)"
+1I4F,anchor_offset_2,2.0,True,"[35.3806, -0.0317, 19.0934]","[35.3319, -0.5309, 17.1573]",23.0,53,53,12,12,0,0,0,,True,NO_OUTPUT

@@ -1,0 +1,27 @@
+{
+  "run_id": "pocket2mol_coverage_recheck10",
+  "metrics_csv": "D:\\obsfu\\sbdd-robust\\data\\results\\metrics_per_condition__runpocket2mol_coverage_recheck10.csv",
+  "flagged_csv": "D:\\obsfu\\sbdd-robust\\data\\results\\metrics_flagged__runpocket2mol_coverage_recheck10.csv",
+  "summary_csv": "D:\\obsfu\\sbdd-robust\\data\\results\\robustness_summary__runpocket2mol_coverage_recheck10.csv",
+  "figure_paths": [],
+  "n_rows": 10,
+  "brittleness_rate": 0.0,
+  "brittleness_counts": {
+    "brittle_pocket_model_pairs": 0,
+    "total_pocket_model_pairs": 10
+  },
+  "git_provenance": {
+    "sbdd_robust_repo_root": "D:\\obsfu\\sbdd-robust",
+    "sbdd_robust_commit": "2757501372c883fad24fe3bf4903b540b2e196e4",
+    "sbdd_robust_dirty": true,
+    "diffsbdd_repo_root": null,
+    "diffsbdd_commit": null,
+    "diffsbdd_dirty": null,
+    "pocket2mol_repo_root": "D:\\obsfu\\Pocket2Mol",
+    "pocket2mol_commit": "836a0c4ce487297ad24bc54ac2ebd163de13242c",
+    "pocket2mol_dirty": true,
+    "targetdiff_repo_root": null,
+    "targetdiff_commit": null,
+    "targetdiff_dirty": null
+  }
+}

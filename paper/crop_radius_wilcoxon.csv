@@ -1,0 +1,5 @@
+dataset,metric,comparison,n_pairs,n_zero_diff,mean_delta,median_delta,wilcoxon_W,p_value,rank_biserial_r,z,effect_size_r_z,median_ci95_lo,median_ci95_hi,mean_ci95_lo,mean_ci95_hi
+real47,dQED,crop_radius_minus_1.5 vs original,47,0,-0.0413,-0.0562,159.0,5.303354257080173e-06,-0.7181,-4.2858,0.6251,-0.0719,-0.0232,-0.0571,-0.0244
+real47,dSA,crop_radius_minus_1.5 vs original,47,0,0.0086,-0.004,559.0,0.962380165638109,0.0089,0.0529,0.0077,-0.2148,0.1916,-0.1845,0.1966
+real100,dQED,crop_radius_minus_1.5 vs original,99,0,-0.0625,-0.0602,658.0,2.2701268348445712e-10,-0.7341,-6.3419,0.6374,-0.0797,-0.0339,-0.0784,-0.047
+real100,dSA,crop_radius_minus_1.5 vs original,99,0,0.1204,0.0416,2127.0,0.22451073565656865,0.1406,1.2146,0.1221,-0.1401,0.2639,-0.0359,0.2751

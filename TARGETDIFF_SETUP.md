@@ -16,21 +16,31 @@ Generated molecules appear under ``<result_path>/sdf/*.sdf``; the adapter loads 
 
 ## Environment
 
-1. Create a conda env matching TargetDiff (see their `environment.yaml`).
-2. Set:
+1. Clone https://github.com/guanjq/targetdiff and download pretrained checkpoints into
+   ``pretrained_models/`` (see upstream README Google Drive link).
+2. On this machine we reuse the **pocket2mol** conda env (torch 1.13 + pyg) for upstream
+   sampling; install **openbabel** if missing:
 
-```text
-set TARGETDIFF_REPO=D:\path\to\targetdiff
-set TARGETDIFF_PYTHON=D:\path\to\conda\envs\targetdiff\python.exe
-set TARGETDIFF_SAMPLING_YAML=D:\path\to\targetdiff\configs\sampling.yml
+```powershell
+conda install -n pocket2mol -c conda-forge openbabel -y
 ```
 
-3. Download a pretrained checkpoint referenced by that sampling config (see TargetDiff README).
+3. NumPy ≥1.24 removed ``np.long`` / ``np.bool`` aliases used upstream; patch
+   ``utils/data.py`` and ``datasets/protein_ligand.py`` in your clone (``np.int64``,
+   ``np.bool_``) or use an older NumPy pin.
+4. Do **not** set ``PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`` for torch 1.13.
+5. Set:
 
-4. Run:
+```text
+set TARGETDIFF_REPO=D:\obsfu\targetdiff
+set TARGETDIFF_PYTHON=D:\Miniforge\envs\pocket2mol\python.exe
+set TARGETDIFF_SAMPLING_YAML=D:\obsfu\targetdiff\configs\sampling.yml
+```
 
-```bash
-pocketbench run --config configs/targetdiff_real100.yaml
+6. ISR smoke panel (matched 5-pocket panel vs Pocket2Mol):
+
+```powershell
+powershell -File scripts/run_targetdiff_isr_smoke_local.ps1
 ```
 
 `run_meta__*.json` records `targetdiff_commit` when `TARGETDIFF_REPO` is a git clone.

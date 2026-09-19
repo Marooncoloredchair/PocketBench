@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import QED, RDConfig
+from rdkit.Chem import Descriptors, QED, RDConfig
 
 _SA_SCORER = None
 
@@ -80,11 +80,16 @@ def summarize_molecules(mols: List[Chem.Mol]) -> Dict[str, Any]:
 
     qeds: list[float] = []
     sas: list[float] = []
+    mws: list[float] = []
     for m, ok in zip(mols, valid_flags, strict=True):
         if not ok:
             continue
         try:
             qeds.append(float(QED.qed(m)))
+        except Exception:
+            pass
+        try:
+            mws.append(float(Descriptors.MolWt(m)))
         except Exception:
             pass
         sa = _sa_score(m)
@@ -101,4 +106,41 @@ def summarize_molecules(mols: List[Chem.Mol]) -> Dict[str, Any]:
         "std_qed": float(np.std(qeds)) if qeds else float("nan"),
         "mean_sa": float(np.mean(sas)) if sas else float("nan"),
         "std_sa": float(np.std(sas)) if sas else float("nan"),
+        "mean_mw": float(np.mean(mws)) if mws else float("nan"),
+        "std_mw": float(np.std(mws)) if mws else float("nan"),
     }
+
+
+def per_molecule_records(mols: List[Chem.Mol]) -> List[Dict[str, Any]]:
+    """Per-molecule QED / molecular weight / SMILES for valid molecules.
+
+    Persisting these prevents the SUBSTRATE_MISSING situation where per-molecule
+    QED and MW are computed for the aggregate summary and then discarded, leaving
+    downstream analyses (e.g. ΔQED~ΔMW) with no molecule-level substrate.
+    """
+    recs: List[Dict[str, Any]] = []
+    for idx, m in enumerate(mols):
+        ok = is_valid_mol(m)
+        rec: Dict[str, Any] = {
+            "mol_index": idx,
+            "valid": bool(ok),
+            "smiles": None,
+            "qed": float("nan"),
+            "mw": float("nan"),
+            "sa": float("nan"),
+        }
+        if ok:
+            rec["smiles"] = canonical_smiles(m)
+            try:
+                rec["qed"] = float(QED.qed(m))
+            except Exception:
+                pass
+            try:
+                rec["mw"] = float(Descriptors.MolWt(m))
+            except Exception:
+                pass
+            sa = _sa_score(m)
+            if sa is not None:
+                rec["sa"] = float(sa)
+        recs.append(rec)
+    return recs

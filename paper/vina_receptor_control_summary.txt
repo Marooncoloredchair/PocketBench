@@ -1,0 +1,20 @@
+Vina receptor-control decomposition (Job A)
+run_id: diffsbdd_real100_vina
+n_pockets: 99
+crop_tag: crop_radius_minus_1.5
+control: original_mols_cropped_receptor
+
+Absolute Vina scores use pocket-only receptors (Job A / this control), so means are typically much weaker than whole-protein docking literature (e.g. smoke ~-2.5 kcal/mol). Interpret only relative shifts between conditions (dVina), not absolute affinity.
+
+Per-component paired Wilcoxon (Δ vs 0):
+  total: median d=+0.2340, p=2.722e-04, rank-biserial r=+0.421, n=99
+  receptor_effect: median d=+0.2989, p=5.068e-03, rank-biserial r=+0.324, n=99
+  molecule_effect: median d=+0.0540, p=5.073e-05, rank-biserial r=+0.469, n=99
+
+median |dVina_total|=0.5566
+median |dVina_receptor_effect|=0.5808
+median |dVina_molecule_effect|=0.1033
+median receptor/total ratio (signed)=0.971
+
+Wrote paper/vina_receptor_control_per_pocket.csv
+Wrote paper/vina_receptor_control_wilcoxon.csv

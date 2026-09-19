@@ -369,6 +369,33 @@ def cmd_run(args: argparse.Namespace) -> int:
                 wdir.mkdir(parents=True, exist_ok=True)
                 mols = adapter.generate(pock, n_samples=n_samples, workdir=wdir)
                 summary = chem_mod.summarize_molecules(mols)
+                # Persist per-molecule QED / MW / SMILES so molecule-level analyses
+                # (e.g. ΔQED~ΔMW) are never blocked by SUBSTRATE_MISSING later.
+                try:
+                    permol = chem_mod.per_molecule_records(mols)
+                    for r in permol:
+                        r.update(
+                            {
+                                "pocket_id": pid,
+                                "perturbation_tag": ptag,
+                                "perturbation_type": pock.metadata.get("perturbation_type", ""),
+                                "model_name": adapter.name,
+                                "run_id": run_id,
+                            }
+                        )
+                    permol_csv = results_dir / f"per_molecule__run{run_id}.csv"
+                    permol_df = pd.DataFrame(permol)
+                    permol_df.to_csv(
+                        permol_csv,
+                        mode="a",
+                        header=not permol_csv.exists(),
+                        index=False,
+                    )
+                except Exception as _permol_err:  # never fail a run over the sidecar
+                    print(
+                        f"[sbdd_robust] per-molecule sidecar skipped for {pid}/{ptag}: {_permol_err}",
+                        file=sys.stderr,
+                    )
                 if compute_dock and pock.ligand_centroid is not None:
                     from sbdd_robust.metrics import docking as dock_mod
 

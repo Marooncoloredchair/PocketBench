@@ -1,0 +1,6 @@
+pocket_id,perturbation_type,perturbation_tag,model_name,run_id,n_total,n_valid,validity,n_unique_valid,uniqueness,mean_qed,std_qed,mean_sa,std_sa
+1AO7,original,original,targetdiff,targetdiff_isr_1ao7_rerun,3,3,1.0,3,1.0,0.26692102683933033,0.027991155481877476,5.785839113089659,0.2888190137656019
+1AO7,invariant_atom_shuffle,atom_shuffle,targetdiff,targetdiff_isr_1ao7_rerun,3,3,1.0,3,1.0,0.26692102683933033,0.027991155481877476,5.785839113089659,0.2888190137656019
+1AO7,invariant_coordinate_jitter,coordinate_jitter,targetdiff,targetdiff_isr_1ao7_rerun,4,4,1.0,4,1.0,0.33697242932936683,0.09550889698781642,6.619457198500671,0.5652033773126319
+1AO7,invariant,crop_radius_minus_1.5,targetdiff,targetdiff_isr_1ao7_rerun,2,2,1.0,2,1.0,0.3370546377055255,0.07962110383647869,6.636778486503337,0.017572254090516104
+1AO7,invariant_directional_crop,face_peel_0.25,targetdiff,targetdiff_isr_1ao7_rerun,3,3,1.0,3,1.0,0.29033349511477347,0.021201751346418423,6.471033037259066,0.23513037198246156
